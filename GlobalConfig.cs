@@ -1,14 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Damntry.Utils.Logging;
 
 namespace Damntry.Utils {
 
 	public static class GlobalConfig {
 
+		//TODO Global 4 - Create an Interface and inherit it both here and in TimeLoggerBase so any classes deriving
+		//	TimeLoggerBase must override this GlobalConfig.Logger value.
 
 		public static TimeLoggerBase Logger = DefaultTimeLogger.Logger;
 
