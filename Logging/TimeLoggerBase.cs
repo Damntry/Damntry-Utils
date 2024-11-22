@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Reflection;
+using static System.Net.Mime.MediaTypeNames;
 
 
 namespace Damntry.Utils.Logging {
@@ -15,6 +16,7 @@ namespace Damntry.Utils.Logging {
 	/// </summary>
 	public abstract class TimeLoggerBase {
 
+		protected abstract void Log(string logMessage, LogTier logLevel);
 
 		protected static Lazy<TimeLoggerBase> instance;
 
@@ -23,6 +25,7 @@ namespace Damntry.Utils.Logging {
 		private static string notificationMsgPrefix;
 
 		private static Action<string, LogTier> notificationAction;
+
 
 
 		protected static TimeLoggerBase GetLogInstance(string derivedClassName) {
@@ -38,7 +41,7 @@ namespace Damntry.Utils.Logging {
 
 		protected static void InitializeTimeLogger(Lazy<TimeLoggerBase> instance, bool debugEnabled = false) {
 			if (instance == null) {
-				throw new ArgumentNullException("The instance argument cant be null");
+				throw new ArgumentNullException(nameof(instance));
 			}
 
 			TimeLoggerBase.instance = instance;
@@ -49,7 +52,7 @@ namespace Damntry.Utils.Logging {
 				string notificationMsgPrefix, bool debugEnabled = false) {
 
 			if (notificationAction == null) {
-				throw new ArgumentNullException("The argument notificationAction cannot be null. Call InitializeTimeLogger(...) instead.");
+				throw new ArgumentNullException(nameof(notificationAction), "The argument notificationAction cannot be null. Call InitializeTimeLogger(...) instead.");
 			}
 
 			InitializeTimeLogger(instance, debugEnabled);
@@ -63,7 +66,7 @@ namespace Damntry.Utils.Logging {
 		/// <summary>Useful for when you want to delay adding the game notifications until some time after the logger itself was initialized.</summary>
 		public static void AddGameNotificationSupport(Action<string, LogTier> notificationAction, string notificationMsgPrefix) {
 			if (notificationAction == null) {
-				throw new ArgumentNullException("The argument notificationAction cannot be null.");
+				throw new ArgumentNullException(nameof(notificationAction));
 			}
 
 			TimeLoggerBase.notificationAction = notificationAction;
@@ -121,23 +124,23 @@ namespace Damntry.Utils.Logging {
 
 
 		public void LogTimeInfo(string text, LogCategories category) {
-			LogTime(LogTier.Info, text, category, false);
+			LogTime(LogTier.Info, text, category, false, null);
 		}
 
 		public void LogTimeInfoShowInGame(string text, LogCategories category) {
-			LogTime(LogTier.Info, text, category, true);
+			LogTime(LogTier.Info, text, category, true, null);
 		}
 
 		public void LogTimeDebug(string text, LogCategories category) {
-			LogTime(LogTier.Debug, text, category, false);
+			LogTime(LogTier.Debug, text, category, false, null);
 		}
 
 		public void LogTimeDebugShowInGame(string text, LogCategories category) {
-			LogTime(LogTier.Debug, text, category, true);
+			LogTime(LogTier.Debug, text, category, true, null);
 		}
 
 		public void LogTimeDebug(string text, LogCategories category, bool showInGameNotification) {
-			LogTime(LogTier.Debug, text, category, showInGameNotification);
+			LogTime(LogTier.Debug, text, category, showInGameNotification, null);
 		}
 
 		/// <summary>Check LogTimeDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
@@ -187,11 +190,11 @@ namespace Damntry.Utils.Logging {
 		}
 
 		public void LogTimeWarning(string text, LogCategories category) {
-			LogTime(LogTier.Warning, text, category, false);
+			LogTime(LogTier.Warning, text, category, false, null);
 		}
 
 		public void LogTimeWarningShowInGame(string text, LogCategories category) {
-			LogTime(LogTier.Warning, text, category, true);
+			LogTime(LogTier.Warning, text, category, true, null);
 		}
 
 		public void LogTimeException(Exception e, LogCategories category) {
@@ -210,29 +213,29 @@ namespace Damntry.Utils.Logging {
 			LogTimeExceptionShowInGameWithMessage(text, e, category, true);
 		}
 		private void LogTimeExceptionShowInGameWithMessage(string text, Exception e, LogCategories category, bool showInGame) {
-			string errorMessage = text != null ? $"{text}\n{e.Message}" : $"{e.Message}";
+			string exceptionMessage = FormatException(e, text);
 			string notifText = text != null ? text : e.Message;
 
-			LogTime(LogTier.Fatal, $"{errorMessage} (In {e.TargetSite})\n{e.StackTrace}", category, false);
+			LogTime(LogTier.Fatal, exceptionMessage, category, false, null);
 			if (showInGame) {
 				SendMessageNotificationError(notifText);
 			}
 		}
 
 		public void LogTimeFatal(string text, LogCategories category) {
-			LogTime(LogTier.Fatal, text, category, false);
+			LogTime(LogTier.Fatal, text, category, false, null);
 		}
 
 		public void LogTimeFatalShowInGame(string text, LogCategories category) {
-			LogTime(LogTier.Fatal, text, category, true);
+			LogTime(LogTier.Fatal, text, category, true, null);
 		}
 
 		public void LogTimeError(string text, LogCategories category) {
-			LogTime(LogTier.Error, text, category, false);
+			LogTime(LogTier.Error, text, category, false, null);
 		}
 
 		public void LogTimeErrorShowInGame(string text, LogCategories category) {
-			LogTime(LogTier.Error, text, category, true);
+			LogTime(LogTier.Error, text, category, true, null);
 		}
 
 		private void LogTimeFunc(LogTier logLevel, Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
@@ -244,10 +247,10 @@ namespace Damntry.Utils.Logging {
 		}
 
 		public void LogTime(LogTier logLevel, string text, LogCategories category) {
-			LogTime(logLevel, text, category, false);
+			LogTime(logLevel, text, category, false, null);
 		}
 
-		private void LogTime(LogTier logLevel, string text, LogCategories category, bool showInGameNotification) {
+		public void LogTime(LogTier logLevel, string text, LogCategories category, bool showInGameNotification) {
 			LogTime(logLevel, text, category, showInGameNotification, null);
 		}
 
@@ -280,8 +283,6 @@ namespace Damntry.Utils.Logging {
 			}
 		}
 
-		protected abstract void Log(string logMessage, LogTier logLevel);
-
 		public string GetCategoryStringFromCache(LogCategories category) {
 			if (!logCategoryStringCache.TryGetValue(category, out string categoryStr)) {
 				//Doesnt exist in cache yet, add.
@@ -307,6 +308,12 @@ namespace Damntry.Utils.Logging {
 			sbLog.Append(text);
 
 			return sbLog.ToString();
+		}
+
+		public static string FormatException(Exception e, string text = null) {
+			string errorMessage = text != null ? $"{text}\n{e.Message}" : e.Message;
+
+			return $"{errorMessage} (In {e.TargetSite})\n{e.StackTrace}";
 		}
 
 		public void SendMessageNotificationError(string message) {

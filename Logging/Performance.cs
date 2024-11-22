@@ -148,6 +148,10 @@ namespace Damntry.Utils.Logging {
 			StopLogReset(measureName, false, false);
 		}
 
+		public static void StopAndReset(string measureName) {
+			StopLogReset(measureName, false, true);
+		}
+
 		public static void StopLogAndReset(string measureName) {
 			StopLogReset(measureName, true, true);
 		}
