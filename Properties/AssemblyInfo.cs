@@ -38,7 +38,7 @@ using AssemblyInfo;
 namespace AssemblyInfo {
 
 	internal static class Info {
-		internal const string Version = "0.1.5";
+		internal const string Version = "0.1.8";
 	}
 
 }
