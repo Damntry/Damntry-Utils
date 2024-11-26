@@ -58,12 +58,38 @@ namespace Damntry.Utils.Reflection {
 			return argumentTypes?.ToArray();
 		}
 
+		/// <summary>Gets the full path of the .dll file from the assembly that the Type parameter belongs to.</summary>
+		/// <param name="assemblyType">The Type from which to get its assembly.</param>
+		/// <returns>The full file path.</returns>
 		public static string GetAssemblyDllFilePath(Type assemblyType) {
 			return Assembly.GetAssembly(assemblyType).Location;
 		}
 
+		/// <summary>Gets the full folder path that contains the assembly that the Type parameter belongs to.</summary>
+		/// <param name="assemblyType">The Type from which to get its assembly.</param>
+		/// <returns>The full folder path.</returns>
 		public static string GetAssemblyDllFolderPath(Type assemblyType) {
 			return Path.GetDirectoryName(GetAssemblyDllFilePath(assemblyType));
+		}
+
+		/// <summary>
+		/// Creates a path by joining the folder path that contains the assembly that the 
+		/// Type parameter belongs to, with the relative path passed by parameter.
+		/// </summary>
+		/// <param name="assemblyType">The Type from which to get its assembly.</param>
+		/// <param name="addedPath">
+		/// The path to add after the assembly path. Must be a relative 
+		/// path and the starting slash can be omitted.
+		/// </param>
+		/// <returns>The combined path.</returns>
+		public static string GetCombinedPathFromAssemblyFolder(Type assemblyType, string addedPath) {
+			string assemblyPath = GetAssemblyDllFolderPath(assemblyType);
+
+			if (!addedPath.StartsWith(Path.DirectorySeparatorChar.ToString())) {
+				assemblyPath = assemblyPath + Path.DirectorySeparatorChar;
+			}
+
+			return assemblyPath + addedPath;
 		}
 
 	}
