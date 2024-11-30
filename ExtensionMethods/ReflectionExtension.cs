@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 
 namespace Damntry.Utils.ExtensionMethods {
 
@@ -25,6 +26,20 @@ namespace Damntry.Utils.ExtensionMethods {
 
 		public static bool HasCustomAttribute<T>(this Type type) where T : Attribute {
 			return (T)Attribute.GetCustomAttribute(type, typeof(T)) != null;
+		}
+
+		//Taken from https://medium.com/engineered-publicis-sapient/human-friendly-enums-in-c-9a6c2291111
+		public static string GetDescription(this Enum enumValue) {
+			var field = enumValue.GetType().GetField(enumValue.ToString());
+			if (field == null)
+				return enumValue.ToString();
+
+			var attributes = field.GetCustomAttributes(typeof(DescriptionAttribute), false);
+			if (Attribute.GetCustomAttribute(field, typeof(DescriptionAttribute)) is DescriptionAttribute attribute) {
+				return attribute.Description;
+			}
+
+			return enumValue.ToString();
 		}
 
 	}
