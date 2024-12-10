@@ -1,13 +1,14 @@
 ﻿using System.Diagnostics;
+using Damntry.Utils.Timers.StopwatchImpl;
 
 namespace Damntry.Utils.Timers {
 
 	/// <summary>
 	/// Functionality to check if an external event has happened more than a defined number of times within a time period.
 	/// </summary>
-	public class PeriodicTimeLimitedCounter {
+	public class PeriodicTimeLimitedCounter<T> where T : IStopwatch, new() {
 
-		private Stopwatch swLimitHit;
+		private IStopwatch swLimitHit;
 
 		private bool constantPeriodTimer;
 
@@ -42,7 +43,7 @@ namespace Damntry.Utils.Timers {
 			this.hitCounter = ignoreFirstHit ? -1 : 0;
 			this.triggerOncePerPeriod = triggerOncePerPeriod;
 
-			swLimitHit = new Stopwatch();
+			swLimitHit = new T();
 		}
 
 		/// <summary>
@@ -56,7 +57,7 @@ namespace Damntry.Utils.Timers {
 
 			hitCounter++;
 
-			if (swLimitHit.Elapsed.TotalMilliseconds <= maxPeriodTimeMillis) {
+			if (swLimitHit.ElapsedMillisecondsPrecise <= maxPeriodTimeMillis) {
 				if (!constantPeriodTimer) {
 					restartTimePeriod = true;
 				}

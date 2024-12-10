@@ -3,13 +3,15 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Damntry.Utils.Logging;
+using Damntry.Utils.Tasks.AsyncDelay;
+using Damntry.Utils.Tasks.TaskTimeout;
 
 namespace Damntry.Utils.Tasks {
 
 	/// <summary>
 	/// Simplifies the creation and cancellation of a task that can only run one at a time. That is, a new task cant be started if the old one is still running.
 	/// </summary>
-	public class CancellableSingleTask {
+	public class CancellableSingleTask<T> where T : AsyncDelayBase<T> {
 
 		/// <summary>
 		/// Semaphore to lock Start/Stop actions from being executed at the same time. It can also be accessed from outside this class via accessibility methods.
@@ -35,13 +37,18 @@ namespace Damntry.Utils.Tasks {
 		private int maxExternalSemaphoreAcquireTimeMillis;
 
 
+		public bool IsTaskRunning {
+			get {
+				return task != null && task.Status == TaskStatus.Running;
+			}
+		}
 
 		public bool IsCancellationRequested {
 			get {
 				if (cancelTokenSource != null) {
 					return cancelTokenSource.IsCancellationRequested;
 				} else {
-					throw new InvalidOperationException("There is no cancellation token since no task has been started.");
+					return false;
 				}
 			}
 		}
@@ -65,78 +72,74 @@ namespace Damntry.Utils.Tasks {
 		/// <summary>Starts a cancellable task asynchronously.</summary>
 		/// <param name="asyncWorkerFunction">
 		/// Async method to run. You can pass a variable number of parameters using Lambdas.
-		/// Example:   () => AsyncWorkMethod(isXValid, "23")
+		/// Example:   () => AsyncWorkMethod(isXValidMethod, "23")
 		/// </param>
 		/// <param name="taskLogName">Descriptive name of the task to show in logs and exceptions.</param>
 		/// <param name="throwExceptionIfRunning">If a exception should be thrown if the task was previously started and is currently still running.</param>
 		/// <remarks>
-		/// Note that Start and Stop operations wait for each other so, if this call is awaited, it
+		/// Awaiting this call will only wait for the creation of the task, not the completion of the task itself.
+		/// If you want to wait for completion, use the method StartAwaitableTaskAsync instead.
+		/// <para/>
+		/// Note that Start and Stop operations wait for each other, so if this call is awaited, it
 		/// could potentially take a long time if it was recently stopped but hasnt finished yet.
 		/// </remarks>
 		public async Task StartTaskAsync(Func<Task> asyncWorkerFunction, string taskLogName, bool throwExceptionIfRunning) {
-			await StartTaskAsync(asyncWorkerFunction, taskLogName, throwExceptionIfRunning, newThread: false);
+			await StartTaskAsync(asyncWorkerFunction, taskLogName, awaitTask: false, throwExceptionIfRunning, newThread: false);
 		}
 
-		/// <summary>Starts a cancellable task asynchronously, in a new thread.</summary>
+		/// <summary>Starts a cancellable task asynchronously, in the thread pool.</summary>
 		/// <param name="asyncWorkerFunction">
 		/// Async method to run. You can pass a variable number of parameters using Lambdas.
-		/// Example:   () => AsyncWorkMethod(isXValid, "23")
+		/// Example:   () => AsyncWorkMethod(isXValidMethod, "23")
 		/// </param>
 		/// <param name="taskLogName">Descriptive name of the task to show in logs and exceptions.</param>
 		/// <param name="throwExceptionIfRunning">If a exception should be thrown if the task was previously started and is currently still running.</param>
 		/// <remarks>
-		/// Note that Start and Stop operations wait for each other so, if this call is awaited, it
+		/// Awaiting this call will only wait for the creation of the task, not the completion of the task itself.
+		/// If you want to wait for completion, use the method StartAwaitableThreadedTaskAsync instead.
+		/// <para/>
+		/// Note that Start and Stop operations wait for each other, so if this call is awaited, it
 		/// could potentially take a long time if it was recently stopped but hasnt finished yet.
 		/// </remarks>
-		public async Task StartTaskNewThreadAsync(Func<Task> asyncWorkerFunction, string taskLogName, bool throwExceptionIfRunning) {
-			await StartTaskAsync(asyncWorkerFunction, taskLogName, throwExceptionIfRunning, newThread: true);
+		public async Task StartThreadedTaskAsync(Func<Task> asyncWorkerFunction, string taskLogName, bool throwExceptionIfRunning) {
+			await StartTaskAsync(asyncWorkerFunction, taskLogName, awaitTask: false, throwExceptionIfRunning, newThread: true);
 		}
 
 		/// <summary>
-		/// Starts a cancellable task asynchronously, and waits for its completion. 
-		/// If it takes longer to finish than the time passed through parameter, it calls to cancel
-		/// the worker funcion, waits for it to end, and throws a TimeoutException.
+		/// Starts a cancellable task asynchronously that can be awaited until completion.
 		/// </summary>
 		/// <param name="asyncWorkerFunction">
-		/// Async method to run. It must have a CancellationToken argument that cancels the work done in the function.
-		/// You can pass a variable number of parameters using Lambdas.
-		/// Example:   (cancelToken) => AsyncWorkMethod(isXValid, cancelToken, "23")
+		/// Async method to run. You can pass a variable number of parameters using Lambdas.
+		/// Example:   () => AsyncWorkMethod(isXValidMethod, "23")
 		/// </param>
 		/// <param name="taskLogName">Descriptive name of the task to show in logs and exceptions.</param>
-		/// <param name="maxCompletionTimeMillis">Milliseconds to wait for the task to finish. If it doesnt after this time, a TimeoutException will be thrown.</param>
+		/// <param name="throwExceptionIfRunning">If a exception should be thrown if the task was previously started and is currently still running.</param>
 		/// <remarks>
-		/// Note that Start and Stop operations wait for each other so, if this call is awaited, it
+		/// Note that Start and Stop operations wait for each other, so if this call is awaited, it
 		/// could potentially take a long time if it was recently stopped but hasnt finished yet.
 		/// </remarks>
-		/// <exception cref="TimeoutException">Thrown when the task took longer than maxCompletionTimeMillis.</exception>
-		/// <exception cref="Exception">Cancellation related exceptions are controlled and consumed automatically. Any other exceptions keep propagating.</exception>
-		public static async Task StartTaskAndWaitAsync(Func<CancellationToken, Task> asyncWorkerFunction, string taskLogName, int maxCompletionTimeMillis) {
-			await StartTaskStaticAndWaitAsync(asyncWorkerFunction, taskLogName, newThread: false, maxCompletionTimeMillis);
+		public async Task StartAwaitableTaskAsync(Func<Task> asyncWorkerFunction, string taskLogName, bool throwExceptionIfRunning) {
+			await StartTaskAsync(asyncWorkerFunction, taskLogName, awaitTask: true, throwExceptionIfRunning, newThread: false);
 		}
 
-		/// <summary>
-		/// Starts a cancellable task asynchronously, in a new thread, and waits for its completion. 
-		/// If it takes longer to finish than the time passed through parameter, it calls to cancel
-		/// the worker funcion, waits for it to end, and throws a TimeoutException.
-		/// </summary>
-		/// Throws a TimeoutException if it doesnt finish in time.</summary>
+		/// <summary>Starts a cancellable task asynchronously, in the thread pool, that can be awaited until completion</summary>
 		/// <param name="asyncWorkerFunction">
-		/// Async method to run. It must have a CancellationToken argument that cancels the work done in the function.
-		/// You can pass a variable number of parameters using Lambdas.
+		/// Async method to run. You can pass a variable number of parameters using Lambdas.
+		/// Example:   () => AsyncWorkMethod(isXValidMethod, "23")
 		/// </param>
 		/// <param name="taskLogName">Descriptive name of the task to show in logs and exceptions.</param>
-		/// <param name="maxCompletionTimeMillis">Milliseconds to wait for the task to finish. If it doesnt after this time, a TimeoutException will be thrown.</param>
+		/// <param name="throwExceptionIfRunning">If a exception should be thrown if the task was previously started and is currently still running.</param>
 		/// <remarks>
-		/// Note that Start and Stop operations wait for each other so, if this call is awaited, it
+		/// Note that Start and Stop operations wait for each other, so if this call is awaited, it
 		/// could potentially take a long time if it was recently stopped but hasnt finished yet.
 		/// </remarks>
-		/// <exception cref="TimeoutException">Thrown when the task takes longer than maxCompletionTimeMillis.</exception>
-		/// <exception cref="Exception">Cancellation related exceptions are controlled and consumed automatically. Any other exceptions keep propagating.</exception>
-		public static async Task StartTaskNewThreadAndWaitAsync(Func<CancellationToken, Task> asyncWorkerFunction, string taskLogName, int maxCompletionTimeMillis) {
-			await StartTaskStaticAndWaitAsync(asyncWorkerFunction, taskLogName, newThread: true, maxCompletionTimeMillis);
+		public async Task StartAwaitableThreadedTaskAsync(Func<Task> asyncWorkerFunction, string taskLogName, bool throwExceptionIfRunning) {
+			await StartTaskAsync(asyncWorkerFunction, taskLogName, awaitTask: true, throwExceptionIfRunning, newThread: true);
 		}
 
-		private async Task StartTaskAsync(Func<Task> asyncWorkerFunction, string taskLogName, bool throwIfAlreadyRunning, bool newThread) {
+		
+
+		private async Task StartTaskAsync(Func<Task> asyncWorkerFunction, string taskLogName, bool awaitTask, bool throwIfAlreadyRunning, bool newThread) {
 			await GetSemaphoreLock();
 
 			try {
@@ -161,27 +164,9 @@ namespace Damntry.Utils.Tasks {
 			} finally {
 				semaphoreLock.Release();
 			}
-		}
 
-
-		private static async Task StartTaskStaticAndWaitAsync(Func<CancellationToken, Task> asyncWorkerFunction, string taskLogName, bool newThread, int maxCompletionTimeMillis) {
-			GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", TimeLoggerBase.LogCategories.Task);
-
-			Task workTask;
-			CancellationTokenSource cancelWorker = new CancellationTokenSource();
-			if (newThread) {
-				workTask = Task.Run(() => asyncWorkerFunction(cancelWorker.Token));
-			} else {
-				workTask = asyncWorkerFunction(cancelWorker.Token);
-			}
-
-			bool timeoutOk = await AwaitTaskWithTimeoutAsync(workTask, taskLogName, maxCompletionTimeMillis, throwTimeoutException: false);
-
-			if (!timeoutOk) {
-				cancelWorker.Cancel();
-				await workTask; //If even after all of that, it still gets stuck here, its not my problem anymore.
-
-				throw new TimeoutException($"Task \"{taskLogName}\" is finished but it took longer than " + maxCompletionTimeMillis + "ms.");
+			if (awaitTask) {
+				await task;
 			}
 		}
 
@@ -198,6 +183,12 @@ namespace Damntry.Utils.Tasks {
 			sbBuilder.Append("\" is already running.");
 
 			return sbBuilder.ToString();
+		}
+
+		/// <summary>Stops the task and waits until it is finished.</summary>
+		/// <exception cref="Exception">Cancellation related exceptions are controlled and consumed automatically. Any other exceptions keep propagating.</exception>
+		public async Task StopTaskAndWaitAsync() {
+			await StopTaskAndWaitAsync(null, null, -1);
 		}
 
 		/// <summary>Stops the task and waits until it is finished.</summary>
@@ -281,44 +272,14 @@ namespace Damntry.Utils.Tasks {
 
 				stopTask.Start();
 
-				await AwaitTaskWithTimeoutAsync(stopTask, taskLogName, maxStopTimeMillis, throwTimeoutException: true);
+				await TaskTimeoutMethods<T>.AwaitTaskWithTimeoutAsync(stopTask, taskLogName, maxStopTimeMillis, throwTimeoutException: true);
 
 			} finally {
 				semaphoreLock.Release();
 			}
 		}
 
-		private static async Task<bool> AwaitTaskWithTimeoutAsync(Task task, string taskLogName, int maxStopTimeMillis, bool throwTimeoutException) {
-			CancellationTokenSource cancelDelay = new CancellationTokenSource();
 
-			try {
-				await AwaitTaskWithTimeoutAsync(task, taskLogName, maxStopTimeMillis, cancelDelay.Token);
-
-				if (!task.IsCompleted) {
-					if (throwTimeoutException) {
-						throw new TimeoutException($"Task \"{taskLogName}\" took longer than the specified {maxStopTimeMillis} ms to stop.");
-					} else {
-						return false;
-					}
-				}
-
-				return true;
-			} finally {
-				cancelDelay.Cancel();
-			}
-		}
-
-		private static async Task AwaitTaskWithTimeoutAsync(Task task, string taskLogName, int maxStopTimeMillis, CancellationToken cancelToken) {
-			try {
-				await Task.WhenAny(task, Task.Delay(maxStopTimeMillis, cancelToken));
-			} catch (Exception e) {
-				if (e is TaskCanceledException || e is OperationCanceledException) {
-					GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", TimeLoggerBase.LogCategories.Task);
-				} else {
-					throw;
-				}
-			}
-		}
 
 		private async Task GetSemaphoreLock() {
 			int timeout = -1;

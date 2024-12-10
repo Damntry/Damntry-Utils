@@ -1,18 +1,26 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Damntry.Utils.ExtensionMethods;
 using Damntry.Utils.Logging;
+using Damntry.Utils.Tasks.AsyncDelay;
 
 namespace Damntry.Utils.Tasks {
 
+	//TODO Global 5 - Add a way of making it work so it just ignores repeated calls in the period since the first one was made.
+	//		So as an example, if its being called constantly, and the period is set too 500, it would take the first call, wait
+	//		500ms while ignoring every other call, and then do the Action. Then the cycle repeats.
+
+	//TODO 0 - Rename from DelayedThreadedSingleTask to DelayedSingleTask once I upload changes to Git so it doesnt get confused.
+
 	/// <summary>
-	/// Starts a threaded task after a configurable delay. If a new call to start 
-	/// this task happens while the previous one has not yet been executed, the
+	/// Starts a task after a configurable delay. If a new call to start this 
+	/// task happens while the delay of the previous one has not finished yet, the
 	/// previous task is cancelled and the delay starts over again to execute the task.
 	/// Its meant so a task cant be spammed, and will only execute if it hasnt 
 	/// been called for the specified delay duration.
 	/// </summary>
-	public class DelayedThreadedSingleTask {
+	public class DelayedThreadedSingleTask<T> where T : AsyncDelayBase<T> {
 
 		private Task delayedTask;
 
@@ -30,35 +38,34 @@ namespace Damntry.Utils.Tasks {
 			taskCancel = new CancellationTokenSource();
 		}
 
-
 		public async void Start(int delayMillis) {
-			if (delayedTask != null && !delayedTask.IsCompleted) {
+			if (delayedTask != null && !delayedTask.IsCompleted && !delayedTask.IsCanceled) {
 				//Task is already ongoing. Cancel and wait for it to end.
 				taskCancel.Cancel();
+
 				try {
 					await delayedTask;
-				} catch (TaskCanceledException) { } //Expected. Eat it up.
+				} catch (TaskCanceledException) {
+					//Expected. Eat it up.
+				} catch (Exception ex) {
+					TimeLoggerBase.Logger.LogTimeExceptionWithMessage("Exception while starting and executing delayed task.", ex, TimeLoggerBase.LogCategories.Task);
+				}
 
 				taskCancel = new CancellationTokenSource();
 			}
-			 
-			StartDelayedCancellableTask(delayMillis);
+
+			delayedTask = StartDelayedCancellableTask(delayMillis);
+
+			//Process it to log any possible exceptions
+			delayedTask.FireAndForgetCancels(TimeLoggerBase.LogCategories.Task, true);
 		}
 
-		private void StartDelayedCancellableTask(int delayMillis) {
-			delayedTask = Task.Run(async () => {
-				await Task.Delay(delayMillis, taskCancel.Token);
+		private async Task StartDelayedCancellableTask(int delayMillis) {
+			await AsyncDelayBase<T>.Instance.Delay(delayMillis, taskCancel.Token);
 
-				if (!taskCancel.IsCancellationRequested) {
-					try {
-						actionTask();
-					} catch (Exception ex) {
-						GlobalConfig.TimeLoggerLog.LogTimeExceptionWithMessage("Exception while executing delayed task.", ex, TimeLoggerBase.LogCategories.Task);
-						throw;
-					}
-				}
-
-			}, taskCancel.Token);
+			if (!taskCancel.IsCancellationRequested) {
+				actionTask();
+			}
 		}
 
 	}

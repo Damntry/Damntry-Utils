@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Damntry.Utils.Tasks;
 using Damntry.Utils.ExtensionMethods;
 using static Damntry.Utils.Logging.TimeLoggerBase;
+using Damntry.Utils.Tasks.AsyncDelay;
 
 
 namespace Damntry.Utils.Logging {
@@ -66,7 +67,7 @@ namespace Damntry.Utils.Logging {
 		//Action that writes on our own separate log file
 		private static Action<string> logPerfAction = (string text) => PerfLogger.DLog.LogPerformance(text);
 
-		private static CancellableSingleTask threadedTask = new CancellableSingleTask();
+		private static CancellableSingleTask<AsyncDelay> threadedTask = new CancellableSingleTask<AsyncDelay>();
 
 
 		/// <summary>
@@ -196,7 +197,7 @@ namespace Damntry.Utils.Logging {
 		}
 
 		public static async Task StartLogPerformanceTableNewThread() {
-			await threadedTask.StartTaskNewThreadAsync(LogPerformanceTableInterval, "Logger performance table", true);
+			await threadedTask.StartThreadedTaskAsync(LogPerformanceTableInterval, "Logger performance table", true);
 		}
 
 		public static async Task StopThreadLogPerformanceTable() {
@@ -522,7 +523,7 @@ namespace Damntry.Utils.Logging {
 
 			private static object queueLock;
 
-			private static CancellableSingleTask threadedTask;
+			private static CancellableSingleTask<AsyncDelay> threadedTask;
 
 			StringBuilder sbLogText;
 
@@ -530,7 +531,7 @@ namespace Damntry.Utils.Logging {
 			private PerfLogger() {
 				logQueue = new Queue<string>();
 				queueLock = new object();
-				threadedTask = new CancellableSingleTask();
+				threadedTask = new CancellableSingleTask<AsyncDelay>();
 				sbLogText = new StringBuilder();
 			}
 
@@ -541,7 +542,7 @@ namespace Damntry.Utils.Logging {
 					QueueAtFront(firstPerfLogText);
 				}
 
-				await threadedTask.StartTaskNewThreadAsync(LogConsumer, "Write performance log", true);
+				await threadedTask.StartThreadedTaskAsync(LogConsumer, "Write performance log", true);
 			}
 
 			/// <summary>
