@@ -33,7 +33,7 @@ namespace Damntry.Utils.Tasks.TaskTimeout {
 				await Task.WhenAny(task, AsyncDelayBase<T>.Instance.Delay(maxStopTimeMillis, cancelToken));
 			} catch (Exception e) {
 				if (e is TaskCanceledException || e is OperationCanceledException) {
-					TimeLoggerBase.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", TimeLoggerBase.LogCategories.Task);
+					TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", TimeLogger.LogCategories.Task);
 				} else {
 					throw;
 				}

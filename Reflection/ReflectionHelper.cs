@@ -1,6 +1,9 @@
 ﻿using System;
 using System.CodeDom;
+using System.Linq;
 using System.Reflection;
+using System.Text;
+using Damntry.Utils.Logging;
 
 namespace Damntry.Utils.Reflection {
 
@@ -48,12 +51,34 @@ namespace Damntry.Utils.Reflection {
 			try {
 				return (R)methodInfo.Invoke(classInstance, args);
 			} catch (TargetParameterCountException e) {
-				GlobalConfig.Logger.LogTimeExceptionWithMessage($"Parameter count error while calling method {methodInfo.Name}", e, Logging.TimeLoggerBase.LogCategories.Reflect);
+				TimeLogger.Logger.LogTimeExceptionWithMessage($"Parameter count error while calling method {methodInfo.Name}", e, Logging.TimeLogger.LogCategories.Reflect);
 				throw;
 			}
 		}
 
+		/// <summary>Gets all property and values (.ToString()) of an object through reflection.</summary>
+		/// <param name="target">The object from which we ll get all properties</param>
+		/// <returns>A string where each line is a property and its values.</returns>
+		public static string ListPropertyAndValues(object target) {
+			var properties =
+				from property in target.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+				select new {
+					property.Name,
+					Value = property.GetValue(target, null)
+				};
 
+			var builder = new StringBuilder(12 * properties.Count());
+
+			foreach (var property in properties) {
+				builder
+					.Append(property.Name)
+					.Append(" = ")
+					.Append(property.Value)
+					.AppendLine();
+			}
+
+			return builder.ToString();
+		}
 
 	}
 

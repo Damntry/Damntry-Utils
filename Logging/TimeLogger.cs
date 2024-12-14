@@ -2,66 +2,87 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Reflection;
-using static System.Net.Mime.MediaTypeNames;
 
 
 namespace Damntry.Utils.Logging {
 
+	//TODO 0 - Once I commit, change the name from TimeLogger to TimeLogger so Git doesnt get confused.
 
 	/// <summary>
 	/// Provides logging functionality with features to add log times, categories per log, and automatically call custom functions when logging.
 	/// This class cant be used directly as is, and instead must be inherited.
 	/// See <see cref="DefaultTimeLogger"/> for a basic example of use.
 	/// </summary>
-	public abstract class TimeLoggerBase {
+	public abstract class TimeLogger {
 
-		protected abstract void Log(string logMessage, LogTier logLevel);
 
-		protected static Lazy<TimeLoggerBase> instance;
+		private static TimeLogger instance;
+
+		public static TimeLogger Logger { 
+			get {
+				if (instance == null) {
+					TimeLogger.InitializeTimeLogger<DefaultTimeLogger>(false);
+					instance.LogTimeWarning($"TimeLogger was automatically initialized with a DefaultTimeLogger. If you want " +
+						$" to use a custom logger, call a InitializeTimeLogger...() method earlier.", LogCategories.Loading);
+				}
+				return instance;
+			}
+		}
+		
+
 
 		private Dictionary<LogCategories, string> logCategoryStringCache;
 
+		//TODO 4 - This ended up forgotten. I should probably change it into an error prefix of sorts, so
+		//		it shows when Loglevel error/fatal. This would make it so in ErrorMessageOnAutoPatchFail
+		//		I dont need to pass the mod name manually on every single one.
+		//		Actually it would be better to have a new parameter in the LogTime.. methods with notification
+		//		support where you specify if the prefix is added or not.
 		private static string notificationMsgPrefix;
 
 		private static Action<string, LogTier> notificationAction;
 
 
-
-		protected static TimeLoggerBase GetLogInstance(string derivedClassName) {
-			if (instance == null) {
-				throw new InvalidOperationException($"{derivedClassName} must be initialized first by calling an InitializeTimeLogger...() method.");
-			}
-			return instance.Value;
-		}
-
-
 		public static bool DebugEnabled { get; set; }
 
 
-		protected static void InitializeTimeLogger(Lazy<TimeLoggerBase> instance, bool debugEnabled = false) {
-			if (instance == null) {
-				throw new ArgumentNullException(nameof(instance));
-			}
-
-			TimeLoggerBase.instance = instance;
-			DebugEnabled = debugEnabled;
+		protected TimeLogger() {
+			logCategoryStringCache = new Dictionary<LogCategories, string>();
 		}
 
-		protected static void InitializeTimeLoggerWithGameNotifications(Lazy<TimeLoggerBase> instance, Action<string, LogTier> notificationAction, 
-				string notificationMsgPrefix, bool debugEnabled = false) {
+
+		/// <summary>Custom log implementation called when logging is invoked.</summary>
+		protected abstract void LogMessage(string logMessage, LogTier logLevel);
+
+		/// <summary>
+		/// Initialize any specific functionality of the log system to use.
+		/// </summary>
+		/// <param name="argsT">Custom arguments that the method may receive.</param>
+		protected abstract void InitializeLogger(params object[] argsT);
+
+
+		public static void InitializeTimeLogger<T>(bool debugEnabled = false, params object[] argsT) where T : TimeLogger {
+			DebugEnabled = debugEnabled;
+
+			instance = Activator.CreateInstance<T>();
+			instance.InitializeLogger(argsT);
+		}
+
+		public static void InitializeTimeLoggerWithGameNotifications<T>(Lazy<TimeLogger> instance, Action<string, LogTier> notificationAction, 
+				string notificationMsgPrefix, bool debugEnabled = false, params object[] argsT) where T : TimeLogger {
 
 			if (notificationAction == null) {
 				throw new ArgumentNullException(nameof(notificationAction), "The argument notificationAction cannot be null. Call InitializeTimeLogger(...) instead.");
 			}
 
-			InitializeTimeLogger(instance, debugEnabled);
+			InitializeTimeLogger<T>(debugEnabled, argsT);
 
 			AddGameNotificationSupport(notificationAction, notificationMsgPrefix);
 		}
 
 		//TODO Global 6 - Both AddGameNotificationSupport and RemoveGameNotificationSupport need
 		//	to be locked while logging is happening, in case there is multithreading.
+		//	And most probably some others. Revise.
 
 		/// <summary>Useful for when you want to delay adding the game notifications until some time after the logger itself was initialized.</summary>
 		public static void AddGameNotificationSupport(Action<string, LogTier> notificationAction, string notificationMsgPrefix) {
@@ -69,20 +90,14 @@ namespace Damntry.Utils.Logging {
 				throw new ArgumentNullException(nameof(notificationAction));
 			}
 
-			TimeLoggerBase.notificationAction = notificationAction;
-			TimeLoggerBase.notificationMsgPrefix = notificationMsgPrefix != null ? notificationMsgPrefix : "";
+			TimeLogger.notificationAction = notificationAction;
+			TimeLogger.notificationMsgPrefix = notificationMsgPrefix != null ? notificationMsgPrefix : "";
 		}
 
 		public static void RemoveGameNotificationSupport() {
-			TimeLoggerBase.notificationAction = null;
-			TimeLoggerBase.notificationMsgPrefix = null;
+			TimeLogger.notificationAction = null;
+			TimeLogger.notificationMsgPrefix = null;
 		}
-
-
-		protected TimeLoggerBase() {
-			logCategoryStringCache = new Dictionary<LogCategories, string>();
-		}
-
 
 
 		[Flags]
@@ -112,6 +127,7 @@ namespace Damntry.Utils.Logging {
 			Highlight = 0x40,
 			Notifs = 0x50,
 			AutoPatch = 0x60,
+			MethodChk = 0x70,
 
 			All = ~Null
 		}
@@ -129,6 +145,14 @@ namespace Damntry.Utils.Logging {
 
 		public void LogTimeInfoShowInGame(string text, LogCategories category) {
 			LogTime(LogTier.Info, text, category, true, null);
+		}
+
+		public void LogTimeMessage(string text, LogCategories category) {
+			LogTime(LogTier.Message, text, category, false, null);
+		}
+
+		public void LogTimeMessageShowInGame(string text, LogCategories category) {
+			LogTime(LogTier.Message, text, category, true, null);
 		}
 
 		public void LogTimeDebug(string text, LogCategories category) {
@@ -269,7 +293,7 @@ namespace Damntry.Utils.Logging {
 			//	I cant create a custom context because I might break the notification or Action caller logic, so honestly I dont even know 
 			//	if what I want is possible, but do some research.
 
-			Log(logMessage, logLevel);
+			LogMessage(logMessage, logLevel);
 
 			if (showInGameNotification) {
 				SendMessageNotification(logLevel, text);
@@ -329,43 +353,6 @@ namespace Damntry.Utils.Logging {
 				notificationAction(message, logLevel);
 			}
 		}
-
-
-		/// <summary>Gets all property values (ToString) of an object through reflection.</summary>
-		/// <param name="target">The object from which we ll get all properties</param>
-		/// <returns>A string where each line is a property.</returns>
-		public static string GetPropertiesLog(object target) {
-			var properties =
-				from property in target.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
-				select new {
-					property.Name,
-					Value = property.GetValue(target, null)
-				};
-
-			var builder = new StringBuilder(12 * properties.Count());
-
-			foreach (var property in properties) {
-				builder
-					.Append(property.Name)
-					.Append(" = ")
-					.Append(property.Value)
-					.AppendLine();
-			}
-
-			return builder.ToString();
-		}
-
-		//This is cool and all but it doesnt work without pdb symbols (from the exe? from this dll only?). Anyway, not usable in another environment.
-		/*
-		private static ILogger CreateLoggingException<ILogger>(string errorMessage) where ILogger : Exception {
-			System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace(10, true);
-			string stacktraceString = string.Join("", stackTrace.GetFrames().Skip(2));
-			//string stackTraceString = Environment.StackTrace;
-
-			Logger.LogDebugTime($"Exception: {errorMessage}\n{stacktraceString}", true);
-			return (ILogger)Activator.CreateInstance(typeof(ILogger), new string[] { errorMessage });
-		}
-		*/
 
 	}
 }

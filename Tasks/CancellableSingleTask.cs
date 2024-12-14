@@ -147,7 +147,7 @@ namespace Damntry.Utils.Tasks {
 					if (throwIfAlreadyRunning) {
 						throw new InvalidOperationException(GetTextAlreadyRunningTask(taskLogName));
 					} else {
-						GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => GetTextAlreadyRunningTask(taskLogName), TimeLoggerBase.LogCategories.Task);
+						TimeLogger.Logger.LogTimeDebugFunc(() => GetTextAlreadyRunningTask(taskLogName), TimeLogger.LogCategories.Task);
 						return;
 					}
 				}
@@ -155,7 +155,7 @@ namespace Damntry.Utils.Tasks {
 
 				cancelTokenSource = new CancellationTokenSource();
 
-				GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", TimeLoggerBase.LogCategories.Task);
+				TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", TimeLogger.LogCategories.Task);
 				if (newThread) {
 					task = Task.Run(() => asyncWorkerFunction());
 				} else {
@@ -234,16 +234,16 @@ namespace Damntry.Utils.Tasks {
 				Task stopTask = new Task(async () => {
 
 					if (task == null) {
-						GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It was never started, or already stopped.", TimeLoggerBase.LogCategories.Task);
+						TimeLogger.Logger.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It was never started, or already stopped.", TimeLogger.LogCategories.Task);
 						return;
 					}
 
 					if (cancelTokenSource != null && !task.IsCompleted) {
-						GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => $"Canceling task \"{taskLogName}\"", TimeLoggerBase.LogCategories.Task);
+						TimeLogger.Logger.LogTimeDebugFunc(() => $"Canceling task \"{taskLogName}\"", TimeLogger.LogCategories.Task);
 
 						cancelTokenSource.Cancel();
 					} else {
-						GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It is already finished.", TimeLoggerBase.LogCategories.Task);
+						TimeLogger.Logger.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It is already finished.", TimeLogger.LogCategories.Task);
 					}
 
 					//Wait for task end, and control cancelled exception errors.
@@ -251,7 +251,7 @@ namespace Damntry.Utils.Tasks {
 						await task;
 					} catch (Exception e) {
 						if (e is TaskCanceledException || e is OperationCanceledException) {
-							GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", TimeLoggerBase.LogCategories.Task);
+							TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", TimeLogger.LogCategories.Task);
 						} else {
 							throw;
 						}
@@ -279,7 +279,7 @@ namespace Damntry.Utils.Tasks {
 			}
 		}
 
-
+		
 
 		private async Task GetSemaphoreLock() {
 			int timeout = -1;

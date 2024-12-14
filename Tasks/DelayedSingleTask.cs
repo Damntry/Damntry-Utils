@@ -11,8 +11,6 @@ namespace Damntry.Utils.Tasks {
 	//		So as an example, if its being called constantly, and the period is set too 500, it would take the first call, wait
 	//		500ms while ignoring every other call, and then do the Action. Then the cycle repeats.
 
-	//TODO 0 - Rename from DelayedThreadedSingleTask to DelayedSingleTask once I upload changes to Git so it doesnt get confused.
-
 	/// <summary>
 	/// Starts a task after a configurable delay. If a new call to start this 
 	/// task happens while the delay of the previous one has not finished yet, the
@@ -20,7 +18,7 @@ namespace Damntry.Utils.Tasks {
 	/// Its meant so a task cant be spammed, and will only execute if it hasnt 
 	/// been called for the specified delay duration.
 	/// </summary>
-	public class DelayedThreadedSingleTask<T> where T : AsyncDelayBase<T> {
+	public class DelayedSingleTask<T> where T : AsyncDelayBase<T> {
 
 		private Task delayedTask;
 
@@ -29,7 +27,7 @@ namespace Damntry.Utils.Tasks {
 		private Action actionTask;
 
 
-		public DelayedThreadedSingleTask(Action actionTask) {
+		public DelayedSingleTask(Action actionTask) {
 			if (actionTask == null) {
 				throw new ArgumentNullException(nameof(actionTask));
 			}
@@ -48,7 +46,7 @@ namespace Damntry.Utils.Tasks {
 				} catch (TaskCanceledException) {
 					//Expected. Eat it up.
 				} catch (Exception ex) {
-					TimeLoggerBase.Logger.LogTimeExceptionWithMessage("Exception while starting and executing delayed task.", ex, TimeLoggerBase.LogCategories.Task);
+					TimeLogger.Logger.LogTimeExceptionWithMessage("Exception while starting and executing delayed task.", ex, TimeLogger.LogCategories.Task);
 				}
 
 				taskCancel = new CancellationTokenSource();
@@ -57,7 +55,7 @@ namespace Damntry.Utils.Tasks {
 			delayedTask = StartDelayedCancellableTask(delayMillis);
 
 			//Process it to log any possible exceptions
-			delayedTask.FireAndForgetCancels(TimeLoggerBase.LogCategories.Task, true);
+			delayedTask.FireAndForgetCancels(TimeLogger.LogCategories.Task, true);
 		}
 
 		private async Task StartDelayedCancellableTask(int delayMillis) {

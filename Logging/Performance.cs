@@ -8,8 +8,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Damntry.Utils.Tasks;
 using Damntry.Utils.ExtensionMethods;
-using static Damntry.Utils.Logging.TimeLoggerBase;
 using Damntry.Utils.Tasks.AsyncDelay;
+using static Damntry.Utils.Logging.TimeLogger;
 
 
 namespace Damntry.Utils.Logging {
@@ -32,143 +32,118 @@ namespace Damntry.Utils.Logging {
 	*/
 
 	/// <summary>
-	/// Performance measuring class. Logs both to a (currently) BepInEx _logger, and its own log 
+	/// Performance measuring class. Logs both to a TimeLogger, and, if enabled, its own log file.
+	/// Times are saved and calculated for each measure with the same name, across multiple runs, to provide performance data.
 	/// </summary>
 	public static class Performance {
 
 		private static Dictionary<string, StopwatchMeasure> mapMeasures = new Dictionary<string, StopwatchMeasure>();
 
+		/// <summary>Automatically calculated length of the measure with the longest name.</summary>
 		private static int measureNameMaxLength;
 
-		//Update interval to show the performance table
-		public static readonly int LogTotalsIntervalMilli = 60000;
-
-		//Number of decimals to show on measure timings
+		/// <summary>Number of decimals to show on measure timings</summary>
 		private static readonly int MeasureDecimals = 3;
 
-		//The fixed number of caracters for the measured timings in the performance table.
+		/// <summary>The fixed number of caracters for the measured timings in the performance table.</summary>
 		private static readonly int MeasureTimingsPadding = MeasureDecimals + 9;
 
-		//The fixed number of caracters for the column with the total measured time in the performance table. It can get pretty big.
+		/// <summary>
+		/// The fixed number of caracters for the column with the total measured 
+		/// time in the performance table. It can get too big otherwise.
+		/// </summary>
 		private static readonly int MeasureTotalTimingPadding = MeasureTimingsPadding + 2;
 
-		//The fixed number of caracters for the column with the run count in the performance table.
+		/// <summary>The fixed number of caracters for the column with the run count in the performance table.</summary>
 		private static readonly int RunCountPadding = 8;
 
-		//Small utility stopwatch used to show in the performance table the total time since the first performance measure started running.
+		/// <summary>
+		/// Small utility stopwatch used to show in the performance table
+		/// the total time since the first performance measure started running.
+		/// </summary>
 		private static Stopwatch swPerfTotalRunTime;
 
-		//Non dynamic part of the performance table header.
+		/// <summary>Non dynamic part of the performance table header.</summary>
 		private static readonly Lazy<string> StaticHeaderText = new Lazy<string>(() => GetStaticHeaderText());
 
-		//Non dynamic part of the performance table horizontal separator.
+		/// <summary>Non dynamic part of the performance table horizontal separator.</summary>
 		private static readonly Lazy<string> StaticHorizontalSeparatorText = new Lazy<string>(() => GetStaticHorizontalSeparatorText());
 
-		//Action that writes on our own separate log file
+		/// <summary>Action that writes on our own separate log file</summary>
 		private static Action<string> logPerfAction = (string text) => PerfLogger.DLog.LogPerformance(text);
 
-		private static CancellableSingleTask<AsyncDelay> threadedTask = new CancellableSingleTask<AsyncDelay>();
+		/// <summary>Task for the periodic logging of performance table totals.</summary>
+		private static CancellableSingleTask<AsyncDelay> logTableTask = new CancellableSingleTask<AsyncDelay>();
 
 
-		/// <summary>
-		/// If the messaging Debug mode is enabled. starts/resumes the process of writing to our performance file, passing a text that 
-		/// will be written at the start of the file. 
-		/// Any previous performance logging made before this call was still collecting measures, and logging in the general logging 
-		/// file, but it wouldnt write the pending logs to the specific performance file until this method is called.
-		/// </summary>
-		/// <param name="getFirstPerfLogLineFunc">
-		/// Function that will return the text that will be written at the beginning of the performance log file. Can be null.
-		/// If Debug mode is disabled the function wont be executed, to save processing time generating the string text.
-		/// Useful when you want to specify settings used in this general run to compare against 
-		/// other performance log files.
-		/// </param>
-		public static async Task BeginOrResumePerfFileLoggingWithTextFunc(Func<string> getFirstPerfLogLineFunc) {
-			if (TimeLoggerBase.DebugEnabled) {
-				string firstPerfLogLine = null;
-				if (getFirstPerfLogLineFunc != null) {
-					firstPerfLogLine = getFirstPerfLogLineFunc();
-				}
-
-				await PerfLogger.DLog.BeginPerfFileLoggingWithText(firstPerfLogLine);
-			}
+		private enum StopResetAction {
+			Stop,
+			Reset,
+			Record,
+			Log
 		}
 
-		/// <summary>
-		/// If the messaging Debug mode is enabled. starts/resumes the process of writing to our performance file, passing a text that 
-		/// will be written at the start of the file. 
-		/// Any previous performance logging made before this call was still collecting measures, and logging in the general logging 
-		/// file, but it wouldnt write the pending logs to the specific performance file until this method is called.
-		/// </summary>
-		/// <param name="getFirstPerfLogLineFunc">
-		/// Text that will be written at the beginning of the performance log file. Can be null.
-		/// Useful when you want to specify settings used in this general run to compare against 
-		/// other performance log files.
-		/// </param>
-		public static async Task BeginOrResumePerfFileLoggingWithText(string firstPerfLogLine) {
-			if (TimeLoggerBase.DebugEnabled) {
-				await PerfLogger.DLog.BeginPerfFileLoggingWithText(firstPerfLogLine);
-			}
-		}
-
-		/// <summary>
-		/// If the messaging Debug mode is enabled. starts/resumes the process of writing to our performance file. 
-		/// Any previous performance logging made before this call was still collecting measures, and logging in 
-		/// the general logging file, but it wouldnt write the pending logs to the specific performance file 
-		/// until this method is called.
-		/// </summary>
-		public static async Task BeginOrResumePerfFileLogging() {
-			await PerfLogger.DLog.BeginPerfFileLoggingWithText(null);
-		}
-
-		/// <summary>
-		/// Dumps the backlog of performance measures into the exclusive file, and stops the log consumer from writing to disk. 
-		/// Can be restarted with BeginOrResumePerfFileLogging().
-		/// </summary>
-		public static async Task StopPerfFileLogging() {
-			if (PerfLogger.IsInstanced) {
-				await PerfLogger.DLog.StopPerfFileLogging();
-			}
-		}
 
 		public static void Start(string measureName, bool logTotals) {
 			StopwatchMeasure swMeasure = GetCreateMeasure(measureName, logTotals);
 			swMeasure.Start(false);
 		}
 
-		public static void StartAndResetPreviousRun(string measureName) {
-			StopwatchMeasure swMeasure = GetCreateMeasure(measureName, true);
+		/// <summary>Deletes all previous run values, and starts performance timing from zero.</summary>
+		public static void StartOver(string measureName, bool logTotals) {
+			StopwatchMeasure swMeasure = GetCreateMeasure(measureName, logTotals);
 			swMeasure.Start(true);
 		}
 
-		public static void Resume(string measureName) {
-			StopwatchMeasure swMeasure = GetMeasure(measureName);
-			swMeasure.Start(false);
+		/// <summary>
+		/// Resets performance timing, losing the currently ongoing timer value, if running.
+		/// </summary>
+		public static void Reset(string measureName) {
+			StopOrReset(measureName, StopResetAction.Reset);
 		}
 
+		/// <summary>
+		/// Stops performance timing. Can be resumed with Start(...).
+		/// </summary>
 		public static void Stop(string measureName) {
-			StopLogReset(measureName, false, false);
+			StopOrReset(measureName, StopResetAction.Stop);
 		}
 
-		public static void StopAndReset(string measureName) {
-			StopLogReset(measureName, false, true);
+		/// <summary>
+		/// Stops performance timing, and if it was running, records current run and logs it.
+		/// </summary>
+		public static void StopAndLog(string measureName) {
+			StopOrReset(measureName, StopResetAction.Log);
 		}
 
-		public static void StopLogAndReset(string measureName) {
-			StopLogReset(measureName, true, true);
+		/// <summary>
+		/// Stops performance timing, and if it was running, records current run without logging it.
+		/// </summary>
+		public static void StopAndRecord(string measureName) {
+			StopOrReset(measureName, StopResetAction.Record);
 		}
 
-		private static void StopLogReset(string measureName, bool log, bool reset) {
+		private static void StopOrReset(string measureName, StopResetAction stopResetAction) {
 			StopwatchMeasure swMeasure = GetMeasure(measureName);
-			swMeasure.Stop();
-			//Reset() is where data from the previous run is stored and calculated, so even if it sounds illogical, first we need to reset, then log.
-			if (reset) { swMeasure.Reset(); }
-			if (log) {
-				LogPerformance(() => swMeasure.GetLogString());
-			}
-		}
 
-		private static void LogPerformance(Func<string> logTextFunc) {
-			GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(logTextFunc, LogCategories.PerfTest, (logPerfAction, true));
+			if (stopResetAction == StopResetAction.Reset) {
+				swMeasure.Reset();
+				
+			} else {
+				if (!swMeasure.IsRunning) {
+					return;
+				}
+
+				swMeasure.Stop();
+
+				if (stopResetAction == StopResetAction.Record || stopResetAction == StopResetAction.Log) {
+					swMeasure.RecordRun();
+
+					if (stopResetAction == StopResetAction.Log) {
+						LogPerformance(() => swMeasure.GetLogString());
+					}
+				}
+			}
 		}
 
 		private static StopwatchMeasure GetCreateMeasure(string measureName, bool logTotals) {
@@ -196,24 +171,20 @@ namespace Damntry.Utils.Logging {
 			return stopwatchMeasure;
 		}
 
-		public static async Task StartLogPerformanceTableNewThread() {
-			await threadedTask.StartThreadedTaskAsync(LogPerformanceTableInterval, "Logger performance table", true);
-		}
-
-		public static async Task StopThreadLogPerformanceTable() {
-			await threadedTask.StopTaskAndWaitAsync(5000);
-		}
-
-		private static async Task LogPerformanceTableInterval() {
-			while (!threadedTask.IsCancellationRequested) {
-				await Task.Delay(Performance.LogTotalsIntervalMilli, threadedTask.CancellationToken);
+		private static async Task LogPerformanceTableInterval(int logTableIntervalMillis) {
+			while (!logTableTask.IsCancellationRequested) {
+				await Task.Delay(logTableIntervalMillis, logTableTask.CancellationToken);
 
 				Performance.LogPerformanceTable();
 			}
 		}
 
-		public static void LogPerformanceTable() {
+		private static void LogPerformanceTable() {
 			LogPerformance(() => GetAllMeasuresTotalsSorted());
+		}
+
+		private static void LogPerformance(Func<string> logTextFunc) {
+			TimeLogger.Logger.LogTimeDebugFunc(logTextFunc, LogCategories.PerfTest, (logPerfAction, true));
 		}
 
 		private static string GetAllMeasuresTotalsSorted() {
@@ -279,6 +250,100 @@ namespace Damntry.Utils.Logging {
 		}
 
 
+		public static class PerformanceFileLoggingMethods {
+
+			/// <summary>
+			/// If the messaging Debug mode is enabled. starts/resumes the process of writing to our performance file, passing a text that 
+			/// will be written at the start of the file. 
+			/// Any previous performance logging made before this call was still collecting measures, and logging in the general logging 
+			/// file, but it wouldnt write the pending logs to the specific performance file until this method is called.
+			/// </summary>
+			/// <param name="getFirstPerfLogLineFunc">
+			/// Function that will return the text that will be written at the beginning of the performance log file. Can be null.
+			/// If Debug mode is disabled, the function wont be executed to save processing time generating the string text.
+			/// Useful when you want to specify settings used in this general run to compare against other performance log files.
+			/// </param>
+			public static async Task BeginOrResumePerfFileLoggingWithTextFunc(Func<string> getFirstPerfLogLineFunc) {
+				if (TimeLogger.DebugEnabled) {
+					string firstPerfLogLine = null;
+					if (getFirstPerfLogLineFunc != null) {
+						firstPerfLogLine = getFirstPerfLogLineFunc();
+					}
+
+					await PerfLogger.DLog.BeginPerfFileLoggingWithText(firstPerfLogLine);
+				}
+			}
+
+			/// <summary>
+			/// If the messaging Debug mode is enabled. starts/resumes the process of writing to our performance file, passing a text that 
+			/// will be written at the start of the file. 
+			/// Any previous performance logging made before this call was still collecting measures, and logging in the general logging 
+			/// file, but it wouldnt write the pending logs to the specific performance file until this method is called.
+			/// </summary>
+			/// <param name="firstPerfLogLine">
+			/// Text that will be written at the beginning of the performance log file. Can be null.
+			/// Useful when you want to specify settings used in this general run to compare against 
+			/// other performance log files.
+			/// </param>
+			public static async Task BeginOrResumePerfFileLoggingWithText(string firstPerfLogLine) {
+				if (TimeLogger.DebugEnabled) {
+					await PerfLogger.DLog.BeginPerfFileLoggingWithText(firstPerfLogLine);
+				}
+			}
+
+			/// <summary>
+			/// If the messaging Debug mode is enabled. starts/resumes the process of writing to our performance file. 
+			/// Any previous performance logging made before this call was still collecting measures, and logging in 
+			/// the general logging file, but it wouldnt write the pending logs to the specific performance file 
+			/// until this method is called.
+			/// </summary>
+			public static async Task BeginOrResumePerfFileLogging() {
+				if (TimeLogger.DebugEnabled) {
+					await PerfLogger.DLog.BeginPerfFileLoggingWithText(null);
+				}
+			}
+
+			/// <summary>
+			/// Dumps the backlog of performance measures into the exclusive file, and stops the log consumer from writing to disk. 
+			/// Can be restarted with BeginOrResumePerfFileLogging().
+			/// </summary>
+			public static async Task StopPerfFileLogging() {
+				if (PerfLogger.IsInstanced) {
+					await PerfLogger.DLog.StopPerfFileLogging();
+				}
+			}
+
+		}
+
+		public static class PerformanceTableLoggingMethods {
+
+			/// <summary>
+			/// Starts a threaded task to continuously log, at a configurable interval,
+			/// a formatted table of all previously recorded performance values.
+			/// </summary>
+			/// <param name="logTableIntervalMillis">The interval in milliseconds to output the performance table.</param>
+			/// <remarks>
+			/// Awaiting this call will only wait for the creation of the task, not the completion of the task itself.
+			/// <para/>
+			/// Note that Start and Stop operations wait for each other, so if this call is awaited, it
+			/// could potentially take some time if it was recently stopped but hasnt finished yet.
+			/// </remarks>
+			public static async Task StartLogPerformanceTableNewThread(int logTableIntervalMillis) {
+				await logTableTask.StartThreadedTaskAsync(() => LogPerformanceTableInterval(logTableIntervalMillis), "Logger performance table", true);
+			}
+
+			/// <summary>Stops the performance table logging task, and waits until it is finished.</summary>
+			public static async Task StopThreadLogPerformanceTable() {
+				await logTableTask.StopTaskAndWaitAsync(5000);
+			}
+
+			/// <summary>Outputs in the logs a formatted table of all previously recorded performance values.</summary>
+			public static void LogPerformanceTable() {
+				Performance.LogPerformanceTable();
+			}
+
+		}
+
 		private class StopwatchMeasure : Stopwatch {
 
 			private string name;
@@ -289,7 +354,7 @@ namespace Damntry.Utils.Logging {
 
 			private double lastRunMilli;
 
-			private int counter;
+			private int runCount;
 
 			private double min;
 
@@ -307,46 +372,43 @@ namespace Damntry.Utils.Logging {
 				this.name = measureName;
 				trimmedMean = new TrimmedMean();
 
-				initializeRun();
+				initializeMeasure();
 			}
 
-			private void initializeRun() {
+			private void initializeMeasure() {
 				TotalMilli = 0;
-				counter = 0;
+				runCount = 0;
 				min = int.MaxValue;
 				max = 0;
 				trimmedMean.Initialize();
 			}
 
-			[Obsolete("Use Start(resetTotal) instead.", true)]
+			[Obsolete("Use Start(resetRunValues) instead.", true)]
 			public new void Start() { }
 
 			public void Start(bool resetRunValues) {
 				if (resetRunValues) {
-					initializeRun();
+					initializeMeasure();
 				}
 
 				base.Start();
 			}
 
-			public new void Reset() {
-				calculateRunValues();
 
-				base.Reset();
-			}
-
-			private void calculateRunValues() {
-				lastRunMilli = base.Elapsed.TotalMilliseconds;
-				if (showTotals) {
-					TotalMilli += lastRunMilli;
-					counter++;
-					if (lastRunMilli < min) {
-						min = lastRunMilli;
+			public void RecordRun() {
+				if (IsRunning) {
+					lastRunMilli = base.Elapsed.TotalMilliseconds;
+					if (showTotals) {
+						TotalMilli += lastRunMilli;
+						runCount++;
+						if (lastRunMilli < min) {
+							min = lastRunMilli;
+						}
+						if (lastRunMilli > max) {
+							max = lastRunMilli;
+						}
+						trimmedMean.addNewValue(lastRunMilli);
 					}
-					if (lastRunMilli > max) {
-						max = lastRunMilli;
-					}
-					trimmedMean.addNewValue(lastRunMilli);
 				}
 			}
 
@@ -355,7 +417,7 @@ namespace Damntry.Utils.Logging {
 
 				if (showTotals) {
 					//Calculating the mean trimmed is a slow operation, so we only show it on the performance table and not here.
-					message += $", with a total of {TotalMilli.ToString()}ms spent in {counter} run/s. Avg run: {GetAverageRun(false)}ms, Min: {min}ms, Max: {max}ms";
+					message += $", with a total of {TotalMilli.ToString()}ms spent in {runCount} run/s. Avg run: {GetAverageRun(false)}ms, Min: {min}ms, Max: {max}ms";
 				}
 				message += ".";
 
@@ -364,12 +426,12 @@ namespace Damntry.Utils.Logging {
 
 			public (string name, string total, string runs, string avg, string meanTrim, string min, string max)
 					GetFormattedRunValues(int measureNameMaxLength) {
-				return (name.PadRight(measureNameMaxLength), FormatTiming(TotalMilli), ((this.IsRunning ? "*" : "") + counter).PadLeft(RunCountPadding),
+				return (name.PadRight(measureNameMaxLength), FormatTiming(TotalMilli), ((this.IsRunning ? "*" : "") + runCount).PadLeft(RunCountPadding),
 					GetAverageRun(true), GetMeanTrimmedRun(), FormatTiming(min), FormatTiming(max));
 			}
 
 			private string GetAverageRun(bool formatTiming) {
-				double avg = Math.Round(TotalMilli / counter, MeasureDecimals);
+				double avg = Math.Round(TotalMilli / runCount, MeasureDecimals);
 				return formatTiming ? FormatTiming(avg) : avg.ToString();
 			}
 
@@ -586,11 +648,11 @@ namespace Damntry.Utils.Logging {
 				//	I also need to call BeginPerfFileLogging and StopPerfFileLogging.
 				//	Both start and stop need to start after a delay, the delay resetting after every event call, so if the user spams
 				//		the debug button, it wont do a ton of work for nothing.
-				if (!TimeLoggerBase.DebugEnabled) {
+				if (!TimeLogger.DebugEnabled) {
 					return;
 				}
 
-				GlobalConfig.TimeLoggerLog.LogTimeDebugFunc(() => $"Beginning performance logging on file \"{pathLogFile.Value}\"", LogCategories.Loading);
+				TimeLogger.Logger.LogTimeDebugFunc(() => $"Beginning performance logging on file \"{pathLogFile.Value}\"", LogCategories.Loading);
 
 				while (!threadedTask.IsCancellationRequested) {
 
@@ -599,7 +661,7 @@ namespace Damntry.Utils.Logging {
 					await Task.Delay(logIntervalTime, threadedTask.CancellationToken);
 				}
 
-				GlobalConfig.TimeLoggerLog.LogTimeDebug("Performance logging stopped.", LogCategories.Loading);
+				TimeLogger.Logger.LogTimeDebug("Performance logging stopped.", LogCategories.Loading);
 			}
 
 			private void WriteBacklogToDisk(bool checkCancellation) {
