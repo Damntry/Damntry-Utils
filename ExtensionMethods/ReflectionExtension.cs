@@ -28,6 +28,8 @@ namespace Damntry.Utils.ExtensionMethods {
 			return (T)Attribute.GetCustomAttribute(type, typeof(T)) != null;
 		}
 
+		//TODO Global 4 - Add an optional cache option, but then I might want to move this to its own class.
+
 		//Taken from https://medium.com/engineered-publicis-sapient/human-friendly-enums-in-c-9a6c2291111
 		public static string GetDescription(this Enum enumValue) {
 			var field = enumValue.GetType().GetField(enumValue.ToString());
