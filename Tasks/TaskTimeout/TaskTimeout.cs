@@ -46,7 +46,7 @@ namespace Damntry.Utils.Tasks.TaskTimeout {
 		}
 
 		private static async Task StartTaskStaticAndWaitWithTimeoutAsync(Func<CancellationToken, Task> asyncWorkerFunction, string taskLogName, bool newThread, int maxCompletionTimeMillis) {
-			TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", TimeLogger.LogCategories.Task);
+			TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", LogCategories.Task);
 
 			Task workTask;
 			CancellationTokenSource cancelWorker = new CancellationTokenSource();

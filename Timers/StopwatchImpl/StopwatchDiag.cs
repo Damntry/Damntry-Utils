@@ -36,6 +36,16 @@ namespace Damntry.Utils.Timers.StopwatchImpl {
 			}
 		}
 
+		/// <summary>
+		/// Initializes a new StopwatchDiag instance, sets the elapsed time
+		///     property to zero, and starts measuring elapsed time.
+		/// </summary>
+		public new static StopwatchDiag StartNew() {
+			StopwatchDiag stopwatch = new();
+			stopwatch.Start();
+			return stopwatch;
+		}
+
 	}
 
 }

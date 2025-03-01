@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using Damntry.Utils.Timers.StopwatchImpl;
+﻿using Damntry.Utils.Timers.StopwatchImpl;
 
 namespace Damntry.Utils.Timers {
 

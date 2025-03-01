@@ -1,15 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using Damntry.Utils.Tasks;
 using Damntry.Utils.ExtensionMethods;
+using Damntry.Utils.Tasks;
 using Damntry.Utils.Tasks.AsyncDelay;
-using static Damntry.Utils.Logging.TimeLogger;
 
 
 namespace Damntry.Utils.Logging {
@@ -84,13 +83,13 @@ namespace Damntry.Utils.Logging {
 		}
 
 
-		public static void Start(string measureName, bool logTotals) {
+		public static void Start(string measureName, bool logTotals = true) {
 			StopwatchMeasure swMeasure = GetCreateMeasure(measureName, logTotals);
 			swMeasure.Start(false);
 		}
 
 		/// <summary>Deletes all previous run values, and starts performance timing from zero.</summary>
-		public static void StartOver(string measureName, bool logTotals) {
+		public static void StartOver(string measureName, bool logTotals = true) {
 			StopwatchMeasure swMeasure = GetCreateMeasure(measureName, logTotals);
 			swMeasure.Start(true);
 		}
@@ -110,14 +109,14 @@ namespace Damntry.Utils.Logging {
 		}
 
 		/// <summary>
-		/// Stops performance timing, and if it was running, records current run and logs it.
+		/// Stops performance timing, and if it was running, records current run, logs it, and resets to be ready for a new run.
 		/// </summary>
 		public static void StopAndLog(string measureName) {
 			StopOrReset(measureName, StopResetAction.Log);
 		}
 
 		/// <summary>
-		/// Stops performance timing, and if it was running, records current run without logging it.
+		/// Stops performance timing, and if it was running, records current run without logging it, and resets to be ready for a new run.
 		/// </summary>
 		public static void StopAndRecord(string measureName) {
 			StopOrReset(measureName, StopResetAction.Record);
@@ -189,16 +188,23 @@ namespace Damntry.Utils.Logging {
 
 		private static string GetAllMeasuresTotalsSorted() {
 			//Sort by total time spent, from higher to lower
-			List<StopwatchMeasure> listMeasuresSorted = mapMeasures.Values.ToList<StopwatchMeasure>().OrderByDescending(x => x.TotalMilli).ToList<StopwatchMeasure>();
-			string tabPaddings = "".PadRight(12, '\t');
+			List<StopwatchMeasure> listMeasuresSorted = mapMeasures.Values.ToList<StopwatchMeasure>().
+				OrderByDescending(x => x.TotalMilli).
+				ToList<StopwatchMeasure>();
+			string tabPaddings = "".PadRight(5, '\t');
 
 			string horizontalSeparator = GetLogStringSummaryHorizontalSeparator();
 			string headerText = GetLogStringSummaryHeader();
 
-			StringBuilder measureTotalsTable = new StringBuilder(125 * listMeasuresSorted.Count);
+			StringBuilder measureTotalsTable = new StringBuilder(100 + (125 * listMeasuresSorted.Count));
 
 			measureTotalsTable.Append("Performance table, sorted by total time. ");
-			measureTotalsTable.AppendLine($"The total run time since the Start of the first measure is {swPerfTotalRunTime.Elapsed.ToString("hh':'mm':'ss'.'fff")}");
+			if (swPerfTotalRunTime != null) {
+				measureTotalsTable.AppendLine($"The total run time since the Start of the first measure is " +
+					$"{swPerfTotalRunTime.Elapsed.ToString("hh':'mm':'ss'.'fff")}");
+			} else {
+				measureTotalsTable.AppendLine($"No measures have been created yet.");
+			}
 
 			//Performance table header
 			measureTotalsTable.Append(tabPaddings);
@@ -238,15 +244,15 @@ namespace Damntry.Utils.Logging {
 		}
 
 		private static string GetStaticHeaderText() {
-			return $"| {"Total".PadSides(MeasureTimingsPadding)} | {"Runs".PadSides(RunCountPadding)} | " +
+			return $"| {"Total".PadSides(MeasureTotalTimingPadding)} | {"Runs".PadSides(RunCountPadding)} | " +
 				$"{"Average".PadSides(MeasureTimingsPadding)} | {"Mean Trimmed".PadSides(MeasureTimingsPadding)} | " +
 				$"{"Min".PadSides(MeasureTimingsPadding)} | {"Max".PadSides(MeasureTimingsPadding)} |";
 		}
 
 		private static string GetStaticHorizontalSeparatorText() {
-			return $"|-{"".PadSides(MeasureTimingsPadding, '-')}-|-{"".PadSides(RunCountPadding, '-')}-|-" +    //Total | Runs
-				$"{"".PadSides(MeasureTimingsPadding, '-')}-|-{"".PadSides(MeasureTimingsPadding, '-')}-|-" +   //Avg	| Mean trimmer
-				$"{"".PadSides(MeasureTimingsPadding, '-')}-|-{"".PadSides(MeasureTimingsPadding, '-')}-|";     //Min	| Max
+			return $"|-{"".PadSides(MeasureTotalTimingPadding, '-')}-|-{"".PadSides(RunCountPadding, '-')}-|-" + //Total | Runs
+				$"{"".PadSides(MeasureTimingsPadding, '-')}-|-{"".PadSides(MeasureTimingsPadding, '-')}-|-" +    //Avg	| Mean trimmer
+				$"{"".PadSides(MeasureTimingsPadding, '-')}-|-{"".PadSides(MeasureTimingsPadding, '-')}-|";      //Min	| Max
 		}
 
 
@@ -396,22 +402,23 @@ namespace Damntry.Utils.Logging {
 
 
 			public void RecordRun() {
-				if (IsRunning) {
-					lastRunMilli = base.Elapsed.TotalMilliseconds;
-					if (showTotals) {
-						TotalMilli += lastRunMilli;
-						runCount++;
-						if (lastRunMilli < min) {
-							min = lastRunMilli;
-						}
-						if (lastRunMilli > max) {
-							max = lastRunMilli;
-						}
-						trimmedMean.addNewValue(lastRunMilli);
+				lastRunMilli = base.Elapsed.TotalMilliseconds;
+				if (showTotals) {
+					TotalMilli += lastRunMilli;
+					runCount++;
+					if (lastRunMilli < min) {
+						min = lastRunMilli;
 					}
+					if (lastRunMilli > max) {
+						max = lastRunMilli;
+					}
+					trimmedMean.addNewValue(lastRunMilli);
 				}
+
+				Reset();
 			}
 
+			//TODO Global 3 - Expose this so it can be used from the outside to read the last measure.
 			public string GetLogString() {
 				string message = $"{name} has taken {lastRunMilli} ms";
 
@@ -424,6 +431,8 @@ namespace Damntry.Utils.Logging {
 				return message;
 			}
 
+			//TODO Global 3 - Values that are larger than the space available for the column
+			//	need to change its unit (ms -> seconds, runs -> thousands of runs, etc)
 			public (string name, string total, string runs, string avg, string meanTrim, string min, string max)
 					GetFormattedRunValues(int measureNameMaxLength) {
 				return (name.PadRight(measureNameMaxLength), FormatTiming(TotalMilli), ((this.IsRunning ? "*" : "") + runCount).PadLeft(RunCountPadding),

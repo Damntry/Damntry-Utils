@@ -10,6 +10,14 @@ namespace Damntry.Utils.Reflection {
 
 		private static Assembly[] assemblyCache;
 
+
+		public static MethodInfo GetMethodFromLoadedAssembly(string fullTypeName, 
+				string methodName, bool refreshCache = true) {
+
+			Type type = GetTypeFromLoadedAssemblies(fullTypeName, refreshCache);
+			return type.GetMethod(methodName, ReflectionHelper.AllBindings);
+		}
+
 		/// <summary>
 		/// Searches through all currently loaded assemblies to get a type with the full type name specified.
 		/// This avoids the need to reference a dll to access its functionality.

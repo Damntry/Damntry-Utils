@@ -46,7 +46,7 @@ namespace Damntry.Utils.Tasks {
 				} catch (TaskCanceledException) {
 					//Expected. Eat it up.
 				} catch (Exception ex) {
-					TimeLogger.Logger.LogTimeExceptionWithMessage("Exception while starting and executing delayed task.", ex, TimeLogger.LogCategories.Task);
+					TimeLogger.Logger.LogTimeExceptionWithMessage("Exception while starting and executing delayed task.", ex, LogCategories.Task);
 				}
 
 				taskCancel = new CancellationTokenSource();
@@ -55,7 +55,7 @@ namespace Damntry.Utils.Tasks {
 			delayedTask = StartDelayedCancellableTask(delayMillis);
 
 			//Process it to log any possible exceptions
-			delayedTask.FireAndForgetCancels(TimeLogger.LogCategories.Task, true);
+			delayedTask.FireAndForgetCancels(LogCategories.Task, true);
 		}
 
 		private async Task StartDelayedCancellableTask(int delayMillis) {

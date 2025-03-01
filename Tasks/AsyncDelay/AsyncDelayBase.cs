@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Damntry.Utils.Logging;
 
 namespace Damntry.Utils.Tasks.AsyncDelay {
 
