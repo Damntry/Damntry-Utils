@@ -97,34 +97,36 @@ namespace Damntry.Utils.Logging {
 		/// <summary>
 		/// Resets performance timing, losing the currently ongoing timer value, if running.
 		/// </summary>
-		public static void Reset(string measureName) {
-			StopOrReset(measureName, StopResetAction.Reset);
+		public static void Reset(string measureName, bool doNotWarn = false) {
+			StopOrReset(measureName, StopResetAction.Reset, doNotWarn);
 		}
 
 		/// <summary>
 		/// Stops performance timing. Can be resumed with Start(...).
 		/// </summary>
-		public static void Stop(string measureName) {
-			StopOrReset(measureName, StopResetAction.Stop);
+		public static void Stop(string measureName, bool doNotWarn = false) {
+			StopOrReset(measureName, StopResetAction.Stop, doNotWarn);
 		}
 
 		/// <summary>
 		/// Stops performance timing, and if it was running, records current run, logs it, and resets to be ready for a new run.
 		/// </summary>
-		public static void StopAndLog(string measureName) {
-			StopOrReset(measureName, StopResetAction.Log);
+		public static void StopAndLog(string measureName, bool doNotWarn = false) {
+			StopOrReset(measureName, StopResetAction.Log, doNotWarn);
 		}
 
 		/// <summary>
 		/// Stops performance timing, and if it was running, records current run without logging it, and resets to be ready for a new run.
 		/// </summary>
-		public static void StopAndRecord(string measureName) {
-			StopOrReset(measureName, StopResetAction.Record);
+		public static void StopAndRecord(string measureName, bool doNotWarn = false) {
+			StopOrReset(measureName, StopResetAction.Record, doNotWarn);
 		}
 
-		private static void StopOrReset(string measureName, StopResetAction stopResetAction) {
-			StopwatchMeasure swMeasure = GetMeasure(measureName);
-
+		private static void StopOrReset(string measureName, StopResetAction stopResetAction, bool doNotWarn) {
+			StopwatchMeasure swMeasure = GetMeasure(measureName, doNotWarn);
+			if (swMeasure == null) {
+				return;
+			}
 			if (stopResetAction == StopResetAction.Reset) {
 				swMeasure.Reset();
 				
@@ -161,10 +163,11 @@ namespace Damntry.Utils.Logging {
 			return swMeasure;
 		}
 
-		private static StopwatchMeasure GetMeasure(string measureName) {
+		private static StopwatchMeasure GetMeasure(string measureName, bool doNotWarn) {
 			bool exists = mapMeasures.TryGetValue(measureName, out StopwatchMeasure stopwatchMeasure);
-			if (!exists) {
-				throw new InvalidOperationException($"The specified stopwatch \"{measureName}\" doesnt exist.");
+			if (!exists && !doNotWarn) {
+				TimeLogger.Logger.LogTimeWarning($"The specified stopwatch \"{measureName}\" doesnt exist.", 
+					LogCategories.PerfTest);
 			}
 
 			return stopwatchMeasure;

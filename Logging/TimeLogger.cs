@@ -50,8 +50,11 @@ namespace Damntry.Utils.Logging {
 		JobSched = 1 << 24,
 		KeyMouse = 1 << 25,
 		Highlight = 1 << 26,
-		Other = 1 << 27,	//Too specific to make a category for it.
+		AI = 1 << 27,
 
+
+
+		Other = 1 << 63,	//Too specific to make a category for it.
 		All = ~Null
 	}
 

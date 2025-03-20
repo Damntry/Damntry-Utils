@@ -12,6 +12,7 @@
     <Version>$(VersionPrefix)</Version>
     <AssemblyVersion></AssemblyVersion>
     <FileVersion>0.1.5</FileVersion>
+    <GenerateDocumentationFile>False</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />

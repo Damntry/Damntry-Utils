@@ -46,6 +46,26 @@ namespace Damntry.Utils.Reflection {
 			}
 		}
 
+		public object GetValue(object obj) {
+			if (member.MemberType == MemberTypes.Field) {
+				return Field.GetValue(obj);
+			} else if (member.MemberType == MemberTypes.Property) {
+				return Property.GetValue(obj);
+			}
+			throw new NotImplementedException();
+		}
+
+		public object GetValueStaticAgnostic(object obj) {
+			obj = IsStatic ? null : obj;
+
+			if (member.MemberType == MemberTypes.Field) {
+				return Field.GetValue(obj);
+			} else if (member.MemberType == MemberTypes.Property) {
+				return Property.GetValue(obj);
+			}
+			throw new NotImplementedException();
+		}
+
 
 
 		public override MemberTypes MemberType => member.MemberType;
