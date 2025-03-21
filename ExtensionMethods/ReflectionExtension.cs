@@ -1,4 +1,7 @@
 ﻿using System;
+using System.ComponentModel;
+using System.Linq;
+using System.Reflection;
 
 namespace Damntry.Utils.ExtensionMethods {
 
@@ -23,9 +26,16 @@ namespace Damntry.Utils.ExtensionMethods {
 			return false;
 		}
 
-		public static bool HasCustomAttribute<T>(this Type type) where T : Attribute {
-			return (T)Attribute.GetCustomAttribute(type, typeof(T)) != null;
+		public static bool HasCustomAttribute<T>(this MemberInfo memberInfo) where T : Attribute {
+			return (T)Attribute.GetCustomAttribute(memberInfo, typeof(T)) != null;
 		}
+
+
+		/// <summary>
+		/// From https://stackoverflow.com/a/51441889/739345
+		/// </summary>
+		public static bool IsStatic(this PropertyInfo source, bool nonPublic = true)
+				=> source.GetAccessors(nonPublic).Any(x => x.IsStatic);
 
 	}
 }

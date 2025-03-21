@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using static Damntry.Utils.Logging.TimeLoggerBase;
+using Damntry.Utils.Logging;
 
 namespace Damntry.Utils.ExtensionMethods {
 
@@ -12,16 +12,18 @@ namespace Damntry.Utils.ExtensionMethods {
 		/// Logs all exceptions it throws except "task canceled" type exceptions (TaskCanceledException and OperationCanceledException).
 		/// </summary>
 		/// <param name="category">The log category to use if an exception occurs.</param>
-		public static async void FireAndForgetCancels(this Task task, LogCategories category) {
+		public static async void FireAndForgetCancels(this Task task, LogCategories category, bool dismissCancelLog = false) {
 			try {
 				if (!task.IsCompleted || task.IsFaulted) {
 					await task.ConfigureAwait(false);
 				}
 			} catch (Exception e) {
 				if (e is TaskCanceledException || e is OperationCanceledException) {
-					GlobalConfig.TimeLoggerLog.LogTimeDebug("\"Fire and Forget\" task canceled.", category);
+					if (!dismissCancelLog) {
+						TimeLogger.Logger.LogTimeDebug("\"Fire and Forget\" task successfully canceled.", category);
+					}
 				} else {
-					GlobalConfig.TimeLoggerLog.LogTimeExceptionWithMessage("Error while awaiting \"Fire and Forget\" type of task:", e, category);
+					TimeLogger.Logger.LogTimeExceptionWithMessage("Error while awaiting \"Fire and Forget\" type of task:", e, category);
 				}
 			}
 		}
@@ -38,7 +40,7 @@ namespace Damntry.Utils.ExtensionMethods {
 					await task.ConfigureAwait(false);
 				}
 			} catch (Exception e) {
-				GlobalConfig.TimeLoggerLog.LogTimeExceptionWithMessage("Error while awaiting \"Fire and Forget\" type of task:", e, category);
+				TimeLogger.Logger.LogTimeExceptionWithMessage("Error while awaiting \"Fire and Forget\" type of task:", e, category);
 			}
 		}
 

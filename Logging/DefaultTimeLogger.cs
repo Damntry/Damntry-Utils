@@ -1,27 +1,14 @@
 ﻿using System;
-using System.Xml.Linq;
 
 namespace Damntry.Utils.Logging {
 
-	public sealed class DefaultTimeLogger : TimeLoggerBase {
+	public sealed class DefaultTimeLogger : TimeLogger {
 
 
-		public static DefaultTimeLogger Logger {
-			get {
-				if (instance == null) {
-					InitializeTimeLogger("", false);	//In normal circumstances this would be called from the entry point of the application.
-				}
-				return (DefaultTimeLogger)GetLogInstance(nameof(DefaultTimeLogger));
-			}
-		}
+		protected override void InitializeLogger(params object[] args) { }
 
-		public static void InitializeTimeLogger(string sourceNamePrefix, bool debugEnabled = false) {
-			Lazy<TimeLoggerBase> instance = new Lazy<TimeLoggerBase>(() => new DefaultTimeLogger());
 
-			TimeLoggerBase.InitializeTimeLogger(instance, debugEnabled);
-		}
-
-		protected override void Log(string message, LogTier logLevel) {
+		protected override void LogMessage(string message, LogTier logLevel) {
 			//Since the console doesnt have a use for log levels like log libraries, we simply convert each to a color.
 			ConsoleColor consoleColor = ConsoleColor.Gray;
 
