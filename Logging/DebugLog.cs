@@ -42,6 +42,12 @@ namespace Damntry.Utils.Logging {
 #endif
 		}
 
+		public static void TEMPFATAL(string message, bool onlyIfTrue = true) {
+#if DEBUG
+			Log(LogTier.Fatal, message, onlyIfTrue);
+#endif
+		}
+
 		private static void Log(LogTier logLevel, string message, bool onlyIfTrue = true, LogCategories logCategory = LogCategories.TempTest) {
 #if DEBUG
 			if (onlyIfTrue && TimeLogger.DebugEnabled) {
