@@ -41,6 +41,7 @@ namespace Damntry.Utils.Logging {
 		Events = 1 << 8,
 		Network = 1 << 9,
 		Cache = 1 << 10,
+		UI = 1 << 11,
 
 		//↓ Specific to a project below ↓
 		Notifs = 1 << 20,

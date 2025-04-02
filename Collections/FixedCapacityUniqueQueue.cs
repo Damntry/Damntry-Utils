@@ -1,23 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace Damntry.Utils.Collections {
-	public class FixedCapacityQueue<T> : Queue<T> {
-
-		private int maxCapacity;
-
-		private bool keepOld;
-
+	public class FixedCapacityUniqueQueue<T> : FixedCapacityQueue<T> {
 
 		/// <param name="maxCapacity">Max number of queued elements.</param>
 		/// <param name="keepOld">
 		/// If when queuing a new element where the Queue is already at capacity, should we 
 		/// remove the oldest item and queue the new one, or skip queuing the new element.
 		/// </param>
-		public FixedCapacityQueue(int maxCapacity, bool keepOld) : base(maxCapacity) {
-			this.maxCapacity = maxCapacity;
-			this.keepOld = keepOld;
-		}
+		public FixedCapacityUniqueQueue(int maxCapacity, bool keepOld) : base(maxCapacity, keepOld) { }
 
 		/// <summary>Use <see cref="TryEnqueue(T, out T)"/> instead.</summary>
 		/// <exception cref="NotImplementedException"></exception>
@@ -27,7 +18,8 @@ namespace Damntry.Utils.Collections {
 		}
 
 		/// <summary>
-		/// Enqueues a new item. If the queue is full, and <see cref="keepOld"/> is false, the 
+		/// Enqueues a new item. If the item being queued already exists, it wont be added.
+		/// If the queue is full, and <see cref="keepOld"/> is false, the 
 		/// oldest items at the front of the queue will be dequeued and returned in 
 		/// <paramref name="dequeuedItem"/>
 		/// </summary>
@@ -37,24 +29,17 @@ namespace Damntry.Utils.Collections {
 		/// <returns>True if item was queued.</returns>
 		/// <exception cref="InvalidOperationException">Exception when the Queue has more items 
 		/// than its capacity.</exception>
-		public bool TryEnqueue(T item, out T dequeuedItem) {
-			bool itemQueued = false;
-			dequeuedItem = default;
+		public new bool TryEnqueue(T item, out T dequeuedItem) {
+			dequeuedItem = default(T);
 
-			if (Count > maxCapacity) {
-				throw new InvalidOperationException("This LimitedQueue contains more items than allowed. " +
-					"Avoid casting this FixedCapacityQueue instance into a Queue to call the base Enqueue(T) method.");
-			}
-			if (!keepOld && Count == maxCapacity) {
-				dequeuedItem = Dequeue();
+			if (Count > 0) {
+				//Check that it doesnt exist already.
+				if (Contains(item)) {
+					return false;
+				}
 			}
 
-			if (Count < maxCapacity) {
-				base.Enqueue(item);
-				itemQueued = true;
-			}
-			
-			return itemQueued;
+			return base.TryEnqueue(item, out dequeuedItem);
 		}
 	}
 
