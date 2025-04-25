@@ -30,6 +30,9 @@ namespace Damntry.Utils.Tasks {
 		/// <summary>Indicates if the semaphore is being acquired from an outside source.</summary>
 		private bool isSemaphoreAcquiredManually;
 
+		/// <summary>Logs the debug events of the task.</summary>
+		private bool logEvents;
+
 		/// <summary>
 		/// The maximum expected amount of time to acquire the semaphore when used externally, in milliseconds.
 		/// Any internal, aka Start or Stop, use of the semaphore that fails to acquire it after this time, while its
@@ -43,6 +46,7 @@ namespace Damntry.Utils.Tasks {
 				return task != null && task.Status == TaskStatus.Running;
 			}
 		}
+
 
 		public bool IsCancellationRequested {
 			get {
@@ -59,13 +63,14 @@ namespace Damntry.Utils.Tasks {
 				if (cancelTokenSource != null) {
 					return cancelTokenSource.Token;
 				} else {
-					throw new InvalidOperationException("There is no cancellation token since no task has been started.");
+					throw new InvalidOperationException("There is no cancellation token as no task has been started.");
 				}
 			}
 		}
 
 
-		public CancellableSingleTask() {
+		public CancellableSingleTask(bool logEvents = true) {
+			this.logEvents = logEvents;
 			semaphoreLock = new SemaphoreSlim(1, 1);
 			isSemaphoreAcquiredManually = false;
 		}
@@ -106,6 +111,30 @@ namespace Damntry.Utils.Tasks {
 			await StartTaskAsync(asyncWorkerFunction, taskLogName, awaitTask: false, throwExceptionIfRunning, newThread: true);
 		}
 
+		/// <summary>Starts a cancellable task in the thread pool.</summary>
+		/// <param name="workerFunction">
+		/// Synchronous method to run. You can pass a variable number of parameters using Lambdas.
+		/// Example:   () => WorkMethod(isXValidMethod, "23")
+		/// </param>
+		/// <param name="taskLogName">Descriptive name of the task to show in logs and exceptions.</param>
+		/// <param name="throwExceptionIfRunning">If a exception should be thrown if the task was previously started and is currently still running.</param>
+		/// <remarks>
+		/// Awaiting this call will only wait for the creation of the task, not the completion of the task itself.
+		/// If you want to wait for completion, use the method StartAwaitableThreadedTaskAsync instead.
+		/// <para/>
+		/// Note that Start and Stop operations wait for each other, so if this call is awaited, it
+		/// could potentially take a long time if it was recently stopped but hasnt finished yet.
+		/// </remarks>
+		public async Task StartThreadedTaskAsync(Action workerFunction, string taskLogName, bool throwExceptionIfRunning) {
+			await StartTaskAsync(
+				//Mimic an async function
+				() => { workerFunction(); return Task.CompletedTask; }, 
+				taskLogName, 
+				awaitTask: false, 
+				throwExceptionIfRunning, 
+				newThread: true);
+		}
+
 		/// <summary>
 		/// Starts a cancellable task asynchronously that can be awaited until completion.
 		/// </summary>
@@ -138,8 +167,6 @@ namespace Damntry.Utils.Tasks {
 			await StartTaskAsync(asyncWorkerFunction, taskLogName, awaitTask: true, throwExceptionIfRunning, newThread: true);
 		}
 
-		
-
 		private async Task StartTaskAsync(Func<Task> asyncWorkerFunction, string taskLogName, bool awaitTask, bool throwIfAlreadyRunning, bool newThread) {
 			await GetSemaphoreLock();
 
@@ -148,7 +175,9 @@ namespace Damntry.Utils.Tasks {
 					if (throwIfAlreadyRunning) {
 						throw new InvalidOperationException(GetTextAlreadyRunningTask(taskLogName));
 					} else {
-						TimeLogger.Logger.LogTimeDebugFunc(() => GetTextAlreadyRunningTask(taskLogName), LogCategories.Task);
+						if (logEvents) {
+							TimeLogger.Logger.LogTimeDebugFunc(() => GetTextAlreadyRunningTask(taskLogName), LogCategories.Task);
+						}
 						return;
 					}
 				}
@@ -156,7 +185,9 @@ namespace Damntry.Utils.Tasks {
 
 				cancelTokenSource = new CancellationTokenSource();
 
-				TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", LogCategories.Task);
+				if (logEvents) {
+					TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", LogCategories.Task);
+				}
 				if (newThread) {
 					task = Task.Run(() => asyncWorkerFunction());
 				} else {
@@ -174,7 +205,7 @@ namespace Damntry.Utils.Tasks {
 		}
 
 		private string GetTextAlreadyRunningTask(string taskLogName) {
-			StringBuilder sbBuilder = new StringBuilder(25);
+			StringBuilder sbBuilder = new(25);
 
 			if (this.taskLogName != taskLogName) {
 				sbBuilder.Append("Cant start task \"");
@@ -214,7 +245,7 @@ namespace Damntry.Utils.Tasks {
 		/// <exception cref="TimeoutException">Thrown when stopping the task and executing the Action argument takes longer than maxStopTimeMillis.</exception>
 		/// <exception cref="Exception">Cancellation related exceptions are controlled and consumed automatically. Any other exceptions keep propagating.</exception>
 		public async Task StopTaskAndWaitAsync(Action onTaskStopped, int maxStopTimeMillis) {
-			await StopTaskAndWaitAsync(null, null, maxStopTimeMillis);
+			await StopTaskAndWaitAsync(onTaskStopped, null, maxStopTimeMillis);
 		}
 
 		/// <summary>Stops the task and waits until it is finished.</summary>
@@ -226,7 +257,7 @@ namespace Damntry.Utils.Tasks {
 		/// <exception cref="TimeoutException">Thrown when stopping the task and executing the Func<Task> argument takes longer than maxStopTimeMillis.</exception>
 		/// <exception cref="Exception">Cancellation related exceptions are controlled and consumed automatically. Any other exceptions keep propagating.</exception>
 		public async Task StopTaskAndWaitAsync(Func<Task> onTaskStoppedAsync, int maxStopTimeMillis) {
-			await StopTaskAndWaitAsync(null, null, maxStopTimeMillis);
+			await StopTaskAndWaitAsync(null, onTaskStoppedAsync, maxStopTimeMillis);
 		}
 
 		private async Task StopTaskAndWaitAsync(Action onTaskStopped, Func<Task> onTaskStoppedAsync, int maxStopTimeMillis) {
@@ -234,18 +265,22 @@ namespace Damntry.Utils.Tasks {
 			await GetSemaphoreLock();
 
 			try {
-				Task stopTask = new Task(async () => {
+				Task stopTask = new(async () => {
 
 					if (task == null) {
-						TimeLogger.Logger.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It was never started, or already stopped.", LogCategories.Task);
+						if (logEvents) {
+							TimeLogger.Logger.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It was never started, or already stopped.", LogCategories.Task);
+						}
 						return;
 					}
 
-					if (cancelTokenSource != null && !task.IsCompleted) {
-						TimeLogger.Logger.LogTimeDebugFunc(() => $"Canceling task \"{taskLogName}\"", LogCategories.Task);
+					if (cancelTokenSource != null && !task.IsTaskEnded()) {
+						if (logEvents) {
+							TimeLogger.Logger.LogTimeDebugFunc(() => $"Canceling task \"{taskLogName}\"", LogCategories.Task);
+						}
 
 						cancelTokenSource.Cancel();
-					} else {
+					} else if (logEvents) {
 						TimeLogger.Logger.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It is already finished.", LogCategories.Task);
 					}
 
@@ -254,7 +289,9 @@ namespace Damntry.Utils.Tasks {
 						await task;
 					} catch (Exception e) {
 						if (e is TaskCanceledException || e is OperationCanceledException) {
-							TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", LogCategories.Task);
+							if (logEvents) {
+								TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", LogCategories.Task);
+							}
 						} else {
 							throw;
 						}

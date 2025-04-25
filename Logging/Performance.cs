@@ -131,11 +131,9 @@ namespace Damntry.Utils.Logging {
 				swMeasure.Reset();
 				
 			} else {
-				if (!swMeasure.IsRunning) {
-					return;
+				if (swMeasure.IsRunning) {
+					swMeasure.Stop();
 				}
-
-				swMeasure.Stop();
 
 				if (stopResetAction == StopResetAction.Record || stopResetAction == StopResetAction.Log) {
 					swMeasure.RecordRun();
@@ -423,11 +421,11 @@ namespace Damntry.Utils.Logging {
 
 			//TODO Global 3 - Expose this so it can be used from the outside to read the last measure.
 			public string GetLogString() {
-				string message = $"{name} has taken {lastRunMilli} ms";
+				string message = $"{name} has taken {lastRunMilli:F3} ms";
 
 				if (showTotals) {
 					//Calculating the mean trimmed is a slow operation, so we only show it on the performance table and not here.
-					message += $", with a total of {TotalMilli.ToString()}ms spent in {runCount} run/s. Avg run: {GetAverageRun(false)}ms, Min: {min}ms, Max: {max}ms";
+					message += $", with a total of {TotalMilli:F3}ms spent in {runCount} run/s. Avg run: {GetAverageRun(false)}ms, Min: {min:F3}ms, Max: {max:F3}ms";
 				}
 				message += ".";
 

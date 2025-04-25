@@ -13,6 +13,6 @@ using System.Reflection;
 <#+
     string ProductName = "Damntry Globals";
 	string Description = "Utils usable in any type of project";
-	string Version = "0.4.3";
+	string Version = "0.4.6";
 	string AuthorName = "Damntry";
 #>

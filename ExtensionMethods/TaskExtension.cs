@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Damntry.Utils.Logging;
 
@@ -6,6 +7,13 @@ namespace Damntry.Utils.ExtensionMethods {
 
 	public static class TaskExtensionMethods {
 
+		/// <summary>
+		/// Return if the task has no more work to do.
+		/// It consists of the status Completed, Cancelled, and Faulted.
+		/// </summary>
+		public static bool IsTaskEnded(this Task task) =>
+			//IsCompleted already includes IsCancelled
+			task.IsCompleted || task.IsFaulted;
 
 		/// <summary>
 		/// Hides the CS4014 warning, and indicates that we dont care if the task finishes or what its result is.
@@ -18,7 +26,7 @@ namespace Damntry.Utils.ExtensionMethods {
 					await task.ConfigureAwait(false);
 				}
 			} catch (Exception e) {
-				if (e is TaskCanceledException || e is OperationCanceledException) {
+				if (e is TaskCanceledException || e is OperationCanceledException || e is ThreadAbortException) {
 					if (!dismissCancelLog) {
 						TimeLogger.Logger.LogTimeDebug("\"Fire and Forget\" task successfully canceled.", category);
 					}

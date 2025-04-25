@@ -1,11 +1,10 @@
 ﻿using System;
-using System.Reflection;
-using System.Runtime.InteropServices.ComTypes;
 using Damntry.Utils.Logging;
 
 namespace Damntry.Utils.Events {
 
 	public static class EventMethods {
+
 
 		/// <summary>
 		/// Invokes each of the methods attached to this event, if any. If a method throws 
@@ -34,6 +33,8 @@ namespace Damntry.Utils.Events {
 
 			return allOk;
 		}
+
+		//TODO Global 5 - Create all the Tx with templating up to 10 parameters or so.
 
 		/// <summary>
 		/// Invokes each of the methods attached to this event, if any. If a method throws 
