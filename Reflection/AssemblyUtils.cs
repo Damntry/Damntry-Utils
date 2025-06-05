@@ -54,7 +54,7 @@ namespace Damntry.Utils.Reflection {
 			List<Type> argumentTypes = new(argumentFullTypeNames.Length);
 
 			foreach (string argString in argumentFullTypeNames) {
-				Type argType = AssemblyUtils.GetTypeFromLoadedAssemblies(argString, firstRun ? refreshCache : false);
+				Type argType = GetTypeFromLoadedAssemblies(argString, firstRun ? refreshCache : false);
 				if (argType == null) {
 					throw new ArgumentException($"The type with value \"{argString}\" couldnt be found in the assembly.");
 				}

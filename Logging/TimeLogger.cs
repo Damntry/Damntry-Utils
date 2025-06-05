@@ -52,6 +52,7 @@ namespace Damntry.Utils.Logging {
 		KeyMouse = 1 << 25,
 		Highlight = 1 << 26,
 		AI = 1 << 27,
+		Visuals = 1 << 28,
 
 
 
@@ -205,7 +206,9 @@ namespace Damntry.Utils.Logging {
 		/// </summary>
 		private LogCategories AllowedCategories = LogCategories.Null;
 
-
+		//TODO 0 - There is no point calling all these methods LogTimeXXX when the caller is already TimeLogger,
+		//	not to mention how confusing it is that the order is inverted for each.
+		//	Rename all methods from LogTimeXXXX to LogXXXX
 
 		public void LogTimeInfo(string text, LogCategories category) {
 			LogTimeInternal(LogTier.Info, text, category, false, null);
