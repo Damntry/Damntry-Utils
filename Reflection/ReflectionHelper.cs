@@ -57,7 +57,7 @@ namespace Damntry.Utils.Reflection {
 			try {
 				return (R)methodInfo.Invoke(classInstance, args);
 			} catch (TargetParameterCountException e) {
-				TimeLogger.Logger.LogTimeExceptionWithMessage($"Parameter count error while calling method {methodInfo.Name}", e, Logging.LogCategories.Reflect);
+				TimeLogger.Logger.LogExceptionWithMessage($"Parameter count error while calling method {methodInfo.Name}", e, Logging.LogCategories.Reflect);
 				throw;
 			}
 		}

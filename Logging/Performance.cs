@@ -82,8 +82,10 @@ namespace Damntry.Utils.Logging {
 			Log
 		}
 
-
-		public static void Start(string measureName, bool logTotals = true) {
+        /// <summary>Starts, or resumes, measuring performance.</summary>
+        /// <param name="measureName">Name of the measure for the user to keep a reference to it.</param>
+        /// <param name="logTotals">If it will also calculate and show combined times of all records.</param>
+        public static void Start(string measureName, bool logTotals = true) {
 			StopwatchMeasure swMeasure = GetCreateMeasure(measureName, logTotals);
 			swMeasure.Start(false);
 		}
@@ -131,9 +133,7 @@ namespace Damntry.Utils.Logging {
 				swMeasure.Reset();
 				
 			} else {
-				if (swMeasure.IsRunning) {
-					swMeasure.Stop();
-				}
+				swMeasure.Stop();
 
 				if (stopResetAction == StopResetAction.Record || stopResetAction == StopResetAction.Log) {
 					swMeasure.RecordRun();
@@ -164,7 +164,7 @@ namespace Damntry.Utils.Logging {
 		private static StopwatchMeasure GetMeasure(string measureName, bool doNotWarn) {
 			bool exists = mapMeasures.TryGetValue(measureName, out StopwatchMeasure stopwatchMeasure);
 			if (!exists && !doNotWarn) {
-				TimeLogger.Logger.LogTimeWarning($"The specified stopwatch \"{measureName}\" doesnt exist.", 
+				TimeLogger.Logger.LogWarning($"The specified stopwatch \"{measureName}\" doesnt exist.", 
 					LogCategories.PerfTest);
 			}
 
@@ -184,7 +184,7 @@ namespace Damntry.Utils.Logging {
 		}
 
 		private static void LogPerformance(Func<string> logTextFunc) {
-			TimeLogger.Logger.LogTimeDebugFunc(logTextFunc, LogCategories.PerfTest, (logPerfAction, true));
+			TimeLogger.Logger.LogDebugFunc(logTextFunc, LogCategories.PerfTest, (logPerfAction, true));
 		}
 
 		private static string GetAllMeasuresTotalsSorted() {
@@ -205,6 +205,7 @@ namespace Damntry.Utils.Logging {
 					$"{swPerfTotalRunTime.Elapsed.ToString("hh':'mm':'ss'.'fff")}");
 			} else {
 				measureTotalsTable.AppendLine($"No measures have been created yet.");
+				return measureTotalsTable.ToString();
 			}
 
 			//Performance table header
@@ -419,7 +420,8 @@ namespace Damntry.Utils.Logging {
 				Reset();
 			}
 
-			//TODO Global 3 - Expose this so it can be used from the outside to read the last measure.
+			//TODO Global 3 - Expose this but only the raw and calculated values in an object, so
+			//	it can be used from the outside to read the last measure.
 			public string GetLogString() {
 				string message = $"{name} has taken {lastRunMilli:F3} ms";
 
@@ -662,7 +664,7 @@ namespace Damntry.Utils.Logging {
 					return;
 				}
 
-				TimeLogger.Logger.LogTimeDebugFunc(() => $"Beginning performance logging on file \"{pathLogFile.Value}\"", LogCategories.Loading);
+				TimeLogger.Logger.LogDebugFunc(() => $"Beginning performance logging on file \"{pathLogFile.Value}\"", LogCategories.Loading);
 
 				while (!threadedTask.IsCancellationRequested) {
 
@@ -671,7 +673,7 @@ namespace Damntry.Utils.Logging {
 					await Task.Delay(logIntervalTime, threadedTask.CancellationToken);
 				}
 
-				TimeLogger.Logger.LogTimeDebug("Performance logging stopped.", LogCategories.Loading);
+				TimeLogger.Logger.LogDebug("Performance logging stopped.", LogCategories.Loading);
 			}
 
 			private void WriteBacklogToDisk(bool checkCancellation) {

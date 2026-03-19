@@ -57,7 +57,7 @@ namespace Damntry.Utils.Logging {
 		private static void Log(LogTier logLevel, string message, bool onlyIfTrue = true, LogCategories logCategory = LogCategories.TempTest) {
 #if DEBUG
 			if (onlyIfTrue && TimeLogger.DebugEnabled) {
-				TimeLogger.Logger.LogTime(logLevel, message, logCategory);
+				TimeLogger.Logger.Log(logLevel, message, logCategory);
 			}
 #endif
 		}
@@ -65,7 +65,7 @@ namespace Damntry.Utils.Logging {
 		private static void LogFunc(LogTier logLevel, Func<string> textLambda, bool onlyIfTrue = true, LogCategories logCategory = LogCategories.TempTest) {
 #if DEBUG
 			if (onlyIfTrue && TimeLogger.DebugEnabled) {
-				TimeLogger.Logger.LogTimeFunc(logLevel, textLambda, logCategory, false, null);
+				TimeLogger.Logger.LogFunc(logLevel, textLambda, logCategory, false, null);
 			}
 #endif
 		}

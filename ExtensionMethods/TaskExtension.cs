@@ -28,10 +28,10 @@ namespace Damntry.Utils.ExtensionMethods {
 			} catch (Exception e) {
 				if (e is TaskCanceledException || e is OperationCanceledException || e is ThreadAbortException) {
 					if (!dismissCancelLog) {
-						TimeLogger.Logger.LogTimeDebug("\"Fire and Forget\" task successfully canceled.", category);
+						TimeLogger.Logger.LogDebug("\"Fire and Forget\" task successfully canceled.", category);
 					}
 				} else {
-					TimeLogger.Logger.LogTimeExceptionWithMessage("Error while awaiting \"Fire and Forget\" type of task:", e, category);
+					TimeLogger.Logger.LogExceptionWithMessage("Error while awaiting \"Fire and Forget\" type of task:", e, category);
 				}
 			}
 		}
@@ -48,7 +48,7 @@ namespace Damntry.Utils.ExtensionMethods {
 					await task.ConfigureAwait(false);
 				}
 			} catch (Exception e) {
-				TimeLogger.Logger.LogTimeExceptionWithMessage("Error while awaiting \"Fire and Forget\" type of task:", e, category);
+				TimeLogger.Logger.LogExceptionWithMessage("Error while awaiting \"Fire and Forget\" type of task:", e, category);
 			}
 		}
 

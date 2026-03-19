@@ -31,7 +31,7 @@ namespace Damntry.Utils.Logging {
 	public enum LogCategories {
 		Null = 0,			//Not intended for logging. Only used internally for defaults.
 		TempTest = 1,		//Temporary tests not meant for release.
-		Vanilla = 1 << 1,
+		Vanilla = 1 << 1,	//Things that used to work but they dont anymore because of a change in the vanilla game.
 		PerfTest = 1 << 2,	//Temporary performance tests not meant for release.
 		Loading = 1 << 3,
 		Task = 1 << 4,      //Task, threaded or not, related logic.
@@ -53,10 +53,11 @@ namespace Damntry.Utils.Logging {
 		Highlight = 1 << 26,
 		AI = 1 << 27,
 		Visuals = 1 << 28,
+        Audio = 1 << 29,
 
 
 
-		Other = 1 << 63,	//Too specific to make a category for it.
+        Other = 1 << 63,	//Too specific to make a category for it.
 		All = ~Null
 	}
 
@@ -76,7 +77,7 @@ namespace Damntry.Utils.Logging {
 			get {
 				if (instance == null) {
 					TimeLogger.InitializeTimeLogger<DefaultTimeLogger>(false);
-					instance.LogTimeWarning($"TimeLogger has been automatically initialized with a DefaultTimeLogger. " +
+					instance.LogWarning($"TimeLogger has been automatically initialized with a DefaultTimeLogger. " +
 						$"If you want to use a different custom logger, call a InitializeTimeLogger...() method earlier.", 
 						LogCategories.Loading);
 				}
@@ -90,14 +91,16 @@ namespace Damntry.Utils.Logging {
 		//TODO 4 - This ended up forgotten. I should probably change it into an error prefix of sorts, so
 		//		it shows when Loglevel error/fatal. This would make it so in ErrorMessageOnAutoPatchFail
 		//		I dont need to pass the mod name manually on every single one.
-		//		Actually it would be better to have a new parameter in the LogTime... methods with notification
+		//		Actually it would be better to have a new parameter in the Log... methods with notification
 		//		support where you specify if the prefix is added or not.
 		private static string notificationMsgPrefix;
 
-		/// <summary>
-		/// Action method to send a notification.
-		/// </summary>
-		private static Action<string, LogTier> notificationAction;
+		public delegate void NotificationAction(string notificationText, LogTier logTier, bool skipQueue);
+
+        /// <summary>
+        /// Action method to send a notification.
+        /// </summary>
+        private static NotificationAction notificationAction;
 
 		/// <summary>
 		/// Function called before both logging and showing the in game notification,
@@ -147,23 +150,24 @@ namespace Damntry.Utils.Logging {
 		public static void InitializeTimeLogger<T>(PreprocessMessageFunc preprocessMessageFunc, 
 				bool debugEnabled = false, params object[] argsT) 
 					where T : TimeLogger {
-			TimeLogger.DebugEnabled = debugEnabled;
 
-			TimeLogger.globalPreprocessMessageFunc = preprocessMessageFunc;
+			DebugEnabled = debugEnabled;
+
+			globalPreprocessMessageFunc = preprocessMessageFunc;
 
 			instance = Activator.CreateInstance<T>();
 			instance.InitializeLogger(argsT);
 		}
 
-		public static void InitializeTimeLoggerWithGameNotifications<T>(Action<string, LogTier> notificationAction, 
+		public static void InitializeTimeLoggerWithGameNotifications<T>(NotificationAction notificationAction, 
 				string notificationMsgPrefix, bool debugEnabled = false, params object[] argsT) 
 					where T : TimeLogger {
 			InitializeTimeLoggerWithGameNotifications<T>(null, notificationAction, 
 				notificationMsgPrefix, debugEnabled, argsT);
 		}
 
-		public static void InitializeTimeLoggerWithGameNotifications<T>(PreprocessMessageFunc preprocessMessageFunc, 
-				Action<string, LogTier> notificationAction, 
+		public static void InitializeTimeLoggerWithGameNotifications<T>(PreprocessMessageFunc preprocessMessageFunc,
+                NotificationAction notificationAction, 
 				string notificationMsgPrefix, bool debugEnabled = false, params object[] argsT) 
 					where T : TimeLogger {
 
@@ -181,7 +185,7 @@ namespace Damntry.Utils.Logging {
 		//	And most probably some others. Revise.
 
 		/// <summary>Useful for when you want to delay adding the game notifications until some time after the logger itself was initialized.</summary>
-		public static void AddGameNotificationSupport(Action<string, LogTier> notificationAction, string notificationMsgPrefix) {
+		public static void AddGameNotificationSupport(NotificationAction notificationAction, string notificationMsgPrefix) {
 			if (notificationAction == null) {
 				throw new ArgumentNullException(nameof(notificationAction));
 			}
@@ -191,8 +195,8 @@ namespace Damntry.Utils.Logging {
 		}
 
 		public static void RemoveGameNotificationSupport() {
-			TimeLogger.notificationAction = null;
-			TimeLogger.notificationMsgPrefix = null;
+			notificationAction = null;
+			notificationMsgPrefix = null;
 		}
 				
 
@@ -206,56 +210,53 @@ namespace Damntry.Utils.Logging {
 		/// </summary>
 		private LogCategories AllowedCategories = LogCategories.Null;
 
-		//TODO 0 - There is no point calling all these methods LogTimeXXX when the caller is already TimeLogger,
-		//	not to mention how confusing it is that the order is inverted for each.
-		//	Rename all methods from LogTimeXXXX to LogXXXX
 
-		public void LogTimeInfo(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Info, text, category, false, null);
+		public void LogInfo(string text, LogCategories category) {
+			LogInternal(LogTier.Info, text, category, false, null);
 		}
 
-		public void LogTimeInfoShowInGame(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Info, text, category, true, null);
+		public void LogInfoShowInGame(string text, LogCategories category) {
+			LogInternal(LogTier.Info, text, category, true, null);
 		}
 
-		public void LogTimeMessage(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Message, text, category, false, null);
+		public void LogMessage(string text, LogCategories category) {
+			LogInternal(LogTier.Message, text, category, false, null);
 		}
 
-		public void LogTimeMessageShowInGame(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Message, text, category, true, null);
+		public void LogMessageShowInGame(string text, LogCategories category) {
+			LogInternal(LogTier.Message, text, category, true, null);
 		}
 
-		public void LogTimeDebug(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Debug, text, category, false, null);
+		public void LogDebug(string text, LogCategories category) {
+			LogInternal(LogTier.Debug, text, category, false, null);
 		}
 
-		public void LogTimeDebugShowInGame(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Debug, text, category, true, null);
+		public void LogDebugShowInGame(string text, LogCategories category) {
+			LogInternal(LogTier.Debug, text, category, true, null);
 		}
 
-		public void LogTimeDebug(string text, LogCategories category, bool showInGameNotification) {
-			LogTimeInternal(LogTier.Debug, text, category, showInGameNotification, null);
+		public void LogDebug(string text, LogCategories category, bool showInGameNotification) {
+			LogInternal(LogTier.Debug, text, category, showInGameNotification, null);
 		}
 
-		/// <summary>Check LogTimeDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
-		public void LogTimeDebugFunc(Func<string> textLambda, LogCategories category) {
-			LogTimeInternalFunc(LogTier.Debug, textLambda, category, false);
+		/// <summary>Check LogDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
+		public void LogDebugFunc(Func<string> textLambda, LogCategories category) {
+			LogInternalFunc(LogTier.Debug, textLambda, category, false);
 		}
 
-		/// <summary>Check LogTimeDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
-		public void LogTimeDebugFunc(Func<string> textLambda, LogCategories category, params (Action<string> action, bool useFullLog)[] actionsArgs) {
-			LogTimeInternalFunc(LogTier.Debug, textLambda, category, false, actionsArgs);
+		/// <summary>Check LogDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
+		public void LogDebugFunc(Func<string> textLambda, LogCategories category, params (Action<string> action, bool useFullLog)[] actionsArgs) {
+			LogInternalFunc(LogTier.Debug, textLambda, category, false, actionsArgs);
 		}
 
-		/// <summary>Check LogTimeDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
-		public void LogTimeDebugFuncShowInGame(Func<string> textLambda, LogCategories category) {
-			LogTimeInternalFunc(LogTier.Debug, textLambda, category, true);
+		/// <summary>Check LogDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
+		public void LogDebugFuncShowInGame(Func<string> textLambda, LogCategories category) {
+			LogInternalFunc(LogTier.Debug, textLambda, category, true);
 		}
 
-		/// <summary>Check LogTimeDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
-		public void LogTimeDebugFunc(Func<string> textLambda, LogCategories category, bool showInGameNotification) {
-			LogTimeInternalFunc(LogTier.Debug, textLambda, category, showInGameNotification);
+		/// <summary>Check LogDebugFunc((Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs)</summary>
+		public void LogDebugFunc(Func<string> textLambda, LogCategories category, bool showInGameNotification) {
+			LogInternalFunc(LogTier.Debug, textLambda, category, showInGameNotification);
 		}
 
 		/// <summary>
@@ -268,47 +269,47 @@ namespace Damntry.Utils.Logging {
 		///	the string wont get used.<para />
 		///	Still, though a lambda has an almost neligible performance hit, its not free an slightly harder to read, so if we are only 
 		///	passing a literal/constant, no matter if it is using concatenation or string interpolation, it is recommended to use 
-		///	LogTimeDebug instead for simplicity.
+		///	LogDebug instead for simplicity.
 		///	</summary>
 		/// <param name="textLambda">A string lambda. Examples:  <para /> 
 		///		() => var1 + "-" + var2  <para />
 		///		() => $"Count is: {list.Count}" <para />
 		///	You can save the string lambda as a local function, for when you want to reuse it or create before the Logger call: <para />
 		///		string methodNameExample() => var1 + "-" + var2; <para />
-		///		LogTimeDebugFunc(methodNameExample, ...)
+		///		LogDebugFunc(methodNameExample, ...)
 		/// </param>
 		/// <param name="category">The category to show at the beginning of the log.</param>
 		/// <param name="showInGameNotification">True if the originalText will be sent to the preconfigured nofitication Action.</param>
 		/// <param name="actionsArgs">The methods we want to execute after logging is finished. This is intended to be used for logging too.</param>
-		public void LogTimeDebugFunc(Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
-			LogTimeInternalFunc(LogTier.Debug, textLambda, category, showInGameNotification, actionsArgs);
+		public void LogDebugFunc(Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
+			LogInternalFunc(LogTier.Debug, textLambda, category, showInGameNotification, actionsArgs);
 		}
 
-		public void LogTimeWarning(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Warning, text, category, false, null);
+		public void LogWarning(string text, LogCategories category) {
+			LogInternal(LogTier.Warning, text, category, false, null);
 		}
 
-		public void LogTimeWarningShowInGame(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Warning, text, category, true, null);
+		public void LogWarningShowInGame(string text, LogCategories category) {
+			LogInternal(LogTier.Warning, text, category, true, null);
 		}
 
-		public void LogTimeException(Exception e, LogCategories category) {
-			LogTimeExceptionInternal(null, e, category, false);
+		public void LogException(Exception e, LogCategories category) {
+			LogExceptionInternal(null, e, category, false);
 		}
 
-		public void LogTimeExceptionWithMessage(string text, Exception e, LogCategories category) {
-			LogTimeExceptionInternal(text, e, category, false);
+		public void LogExceptionWithMessage(string text, Exception e, LogCategories category) {
+			LogExceptionInternal(text, e, category, false);
 		}
 
-		public void LogTimeExceptionShowInGame(Exception e, LogCategories category) {
-			LogTimeExceptionInternal(null, e, category, true);
+		public void LogExceptionShowInGame(Exception e, LogCategories category) {
+			LogExceptionInternal(null, e, category, true);
 		}
 
-		public void LogTimeExceptionShowInGameWithMessage(string text, Exception e, LogCategories category) {
-			LogTimeExceptionInternal(text, e, category, true);
+		public void LogExceptionShowInGameWithMessage(string text, Exception e, LogCategories category) {
+			LogExceptionInternal(text, e, category, true);
 		}
 
-		private void LogTimeExceptionInternal(string text, Exception e, LogCategories category, bool showInGame) {
+		private void LogExceptionInternal(string text, Exception e, LogCategories category, bool showInGame) {
 
 			PreprocessMessageFunc prepMsgFunc = (string msg, LogTier _, LogCategories _, bool _, PreprocessType prepType) => {
 				if (prepType == PreprocessType.FileLogging) {
@@ -319,66 +320,66 @@ namespace Damntry.Utils.Logging {
 				return null;
 			};
 
-			LogTimeInternal(LogTier.Fatal, text, category, prepMsgFunc, showInGame);
+			LogInternal(LogTier.Fatal, text, category, prepMsgFunc, showInGame);
 		}
 
-		public void LogTimeFatal(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Fatal, text, category, false, null);
+		public void LogFatal(string text, LogCategories category) {
+			LogInternal(LogTier.Fatal, text, category, false, null);
 		}
 
-		public void LogTimeFatalShowInGame(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Fatal, text, category, true, null);
+		public void LogFatalShowInGame(string text, LogCategories category) {
+			LogInternal(LogTier.Fatal, text, category, true, null);
 		}
 
-		public void LogTimeError(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Error, text, category, false, null);
+		public void LogError(string text, LogCategories category) {
+			LogInternal(LogTier.Error, text, category, false, null);
 		}
 
-		public void LogTimeErrorShowInGame(string text, LogCategories category) {
-			LogTimeInternal(LogTier.Error, text, category, true, null);
+		public void LogErrorShowInGame(string text, LogCategories category) {
+			LogInternal(LogTier.Error, text, category, true, null);
 		}
 
-		public void LogTimeFunc(LogTier logLevel, Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
-			LogTimeInternalFunc(logLevel, textLambda, category, showInGameNotification, actionsArgs);
+		public void LogFunc(LogTier logLevel, Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
+			LogInternalFunc(logLevel, textLambda, category, showInGameNotification, actionsArgs);
 		}
 
 
-		private void LogTimeInternalFunc(LogTier logLevel, Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
+		private void LogInternalFunc(LogTier logLevel, Func<string> textLambda, LogCategories category, bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
 			//Return so we skip executing the text lambda and save processing time.
 			if (logLevel == LogTier.Debug && !DebugEnabled) {
 				return;
 			}
 
-			LogTimeInternal(logLevel, textLambda(), category, showInGameNotification, actionsArgs);
+			LogInternal(logLevel, textLambda(), category, showInGameNotification, actionsArgs);
 		}
 
-		public void LogTime(LogTier logLevel, string text, LogCategories category) {
-			LogTimeInternal(logLevel, text, category, false, null);
+		public void Log(LogTier logLevel, string text, LogCategories category) {
+			LogInternal(logLevel, text, category, false, null);
 		}
 
-		public void LogTime(LogTier logLevel, string text, LogCategories category, bool showInGameNotification) {
-			LogTimeInternal(logLevel, text, category, showInGameNotification, null);
+		public void Log(LogTier logLevel, string text, LogCategories category, bool showInGameNotification) {
+			LogInternal(logLevel, text, category, showInGameNotification, null);
 		}
 
-		/// <remarks>
-		/// Be aware that by using this method, any global preprocessor set
-		/// during the initialization of this time logger, wont be used.
-		/// </remarks>
-		public void LogTime(LogTier logLevel, string text, LogCategories category, PreprocessMessageFunc preprocessMsgFunc, 
-				bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
-			LogTimeInternal(logLevel, text, category, preprocessMsgFunc, showInGameNotification, null);
+		public void Log(LogTier logLevel, string text, LogCategories category, PreprocessMessageFunc preprocessMsgFunc, 
+				bool showInGameNotification, bool skipQueue = false, params (Action<string> action, bool useFullLog)[] actionsArgs) {
+			if (preprocessMsgFunc == null) {
+				preprocessMsgFunc = globalPreprocessMessageFunc;
+
+            }
+			LogInternal(logLevel, text, category, preprocessMsgFunc, showInGameNotification, skipQueue, actionsArgs);
 		}
 
-		private void LogTimeInternal(LogTier logLevel, string originalText, LogCategories category, 
-				bool showInGameNotification, params (Action<string> action, bool useFullLog)[] actionsArgs) {
+		private void LogInternal(LogTier logLevel, string originalText, LogCategories category, 
+				bool showInGameNotification, params(Action<string> action, bool useFullLog)[] actionsArgs) {
 
-			LogTimeInternal(logLevel, originalText, category, globalPreprocessMessageFunc, 
-				showInGameNotification, actionsArgs);
+			LogInternal(logLevel, originalText, category, globalPreprocessMessageFunc, 
+				showInGameNotification, false, actionsArgs);
 		}
 
-		private void LogTimeInternal(LogTier logLevel, string originalText, LogCategories category,
-				PreprocessMessageFunc preprocessMsgFunc, bool showInGameNotification,  
-				params (Action<string> action, bool useFullLog)[] actionsArgs) {
+		private void LogInternal(LogTier logLevel, string originalText, LogCategories category,
+				PreprocessMessageFunc preprocessMsgFunc, bool showInGameNotification, bool skipQueue = false,
+                params (Action<string> action, bool useFullLog)[] actionsArgs) {
 			
 			if (logLevel == LogTier.Debug && !DebugEnabled || AllowedCategories != LogCategories.Null && !AllowedCategories.HasFlag(category)) {
 				return;
@@ -403,7 +404,7 @@ namespace Damntry.Utils.Logging {
 				string notifMessage = PreprocessMessage(originalText, logLevel, category, 
 					true, preprocessMsgFunc, PreprocessType.GameNotification);
 
-				SendMessageNotification(logLevel, notifMessage);
+				SendMessageNotification(logLevel, notifMessage, skipQueue);
 			}
 			
 			//Extra methods that the caller wants executed with our processed originalText errorMessage
@@ -462,19 +463,17 @@ namespace Damntry.Utils.Logging {
 			return errorMessage;
 		}
 
-		public void SendMessageNotificationError(string message) {
-			SendMessageNotification(LogTier.Error, message);
+		public void SendMessageNotificationError(string message, bool skipQueue) {
+			SendMessageNotification(LogTier.Error, message, skipQueue);
 		}
 
-		public void SendMessageNotification(LogTier logLevel, string message) {
+		public void SendMessageNotification(LogTier logLevel, string message, bool skipQueue) {
 			if (logLevel == LogTier.Debug && !DebugEnabled) {
 				return;
 			}
 
-			if (notificationAction != null) {
-				notificationAction(message, logLevel);
-			}
-		}
+            notificationAction?.Invoke(message, logLevel, skipQueue);
+        }
 
 	}
 }

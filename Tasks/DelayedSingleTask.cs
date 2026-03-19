@@ -47,7 +47,7 @@ namespace Damntry.Utils.Tasks {
 					if (ex is TaskCanceledException || ex is OperationCanceledException || ex is ThreadAbortException) {
 						//Expected. Eat it up.
 					} else {
-						TimeLogger.Logger.LogTimeExceptionWithMessage("Exception while " +
+						TimeLogger.Logger.LogExceptionWithMessage("Exception while " +
 							"starting and executing delayed task.", ex, LogCategories.Task);
 					}					
 				}

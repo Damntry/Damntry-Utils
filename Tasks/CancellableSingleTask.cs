@@ -43,7 +43,7 @@ namespace Damntry.Utils.Tasks {
 
 		public bool IsTaskRunning {
 			get {
-				return task != null && task.Status == TaskStatus.Running;
+				return task != null && task.Status < TaskStatus.RanToCompletion;
 			}
 		}
 
@@ -176,7 +176,7 @@ namespace Damntry.Utils.Tasks {
 						throw new InvalidOperationException(GetTextAlreadyRunningTask(taskLogName));
 					} else {
 						if (logEvents) {
-							TimeLogger.Logger.LogTimeDebugFunc(() => GetTextAlreadyRunningTask(taskLogName), LogCategories.Task);
+							TimeLogger.Logger.LogDebugFunc(() => GetTextAlreadyRunningTask(taskLogName), LogCategories.Task);
 						}
 						return;
 					}
@@ -186,7 +186,7 @@ namespace Damntry.Utils.Tasks {
 				cancelTokenSource = new CancellationTokenSource();
 
 				if (logEvents) {
-					TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", LogCategories.Task);
+					TimeLogger.Logger.LogDebugFunc(() => $"Task \"{taskLogName}\" is now going to run {(newThread ? "in a new thread" : "asynchronously")}.", LogCategories.Task);
 				}
 				if (newThread) {
 					task = Task.Run(() => asyncWorkerFunction());
@@ -269,19 +269,19 @@ namespace Damntry.Utils.Tasks {
 
 					if (task == null) {
 						if (logEvents) {
-							TimeLogger.Logger.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It was never started, or already stopped.", LogCategories.Task);
+							TimeLogger.Logger.LogDebugFunc(() => $"Cant stop task \"{taskLogName}\". It was never started, or already stopped.", LogCategories.Task);
 						}
 						return;
 					}
 
 					if (cancelTokenSource != null && !task.IsTaskEnded()) {
 						if (logEvents) {
-							TimeLogger.Logger.LogTimeDebugFunc(() => $"Canceling task \"{taskLogName}\"", LogCategories.Task);
+							TimeLogger.Logger.LogDebugFunc(() => $"Canceling task \"{taskLogName}\"", LogCategories.Task);
 						}
 
 						cancelTokenSource.Cancel();
 					} else if (logEvents) {
-						TimeLogger.Logger.LogTimeDebugFunc(() => $"Cant stop task \"{taskLogName}\". It is already finished.", LogCategories.Task);
+						TimeLogger.Logger.LogDebugFunc(() => $"Cant stop task \"{taskLogName}\". It is already finished.", LogCategories.Task);
 					}
 
 					//Wait for task end, and control cancelled exception errors.
@@ -290,7 +290,7 @@ namespace Damntry.Utils.Tasks {
 					} catch (Exception e) {
 						if (e is TaskCanceledException || e is OperationCanceledException) {
 							if (logEvents) {
-								TimeLogger.Logger.LogTimeDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", LogCategories.Task);
+								TimeLogger.Logger.LogDebugFunc(() => $"Task \"{taskLogName}\" successfully canceled.", LogCategories.Task);
 							}
 						} else {
 							throw;
