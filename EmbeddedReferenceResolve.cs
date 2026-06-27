@@ -3,6 +3,9 @@ using System.IO;
 using System.Reflection;
 
 namespace Damntry.Utils {
+
+    /* Commented to avoid Thunderstore flagging a mod as problematic
+    
     public static class EmbeddedReferenceResolve {
 
 
@@ -43,4 +46,5 @@ namespace Damntry.Utils {
             }
         }
     }
+    */
 }
